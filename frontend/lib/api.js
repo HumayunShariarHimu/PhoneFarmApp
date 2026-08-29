@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════
 import axios from 'axios';
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const BASE = process.env.NEXT_PUBLIC_API_URL || 'https://phonefarmapp-production.up.railway.app';
 
 const api = axios.create({
   baseURL: `${BASE}/api`,
