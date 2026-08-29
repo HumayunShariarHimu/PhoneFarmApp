@@ -32,7 +32,8 @@ ENV DISPLAY=:99
 WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
-RUN npm ci && npx prisma generate
+# Railway may build from a filtered source context; use npm install so deployment does not depend on lockfile transfer.
+RUN npm install --no-audit --no-fund && npx prisma generate
 
 COPY src ./src/
 RUN mkdir -p /android/images /app/screenshots /app/apks /app/logs
