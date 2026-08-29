@@ -1,0 +1,433 @@
+// PhoneFarmOS - Complete Database Schema
+// PostgreSQL via Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Virtual Devices (Android VMs) ──────────
+model Device {
+  id            String   @id @default(uuid())
+  name          String
+  brand         String   @default("Android-x86")
+  model         String   @default("Virtual")
+  androidVersion String  @default("9")
+  ram           String   @default("2048MB")
+  cpus          Int      @default(2)
+  resolution    String   @default("1080x1920")
+  
+  // VM info
+  slot          Int      @unique
+  vncPort       Int      @unique
+  adbPort       Int      @unique
+  adbSerial     String?
+  imgPath       String?
+  
+  // Status
+  status        DeviceStatus @default(STOPPED)
+  type          DeviceType   @default(VIRTUAL)
+  
+  // Runtime
+  currentApp    String?
+  currentTask   String?
+  proxyId       String?
+  accountId     String?
+  groupId       String?
+  
+  // Metrics
+  totalEarnings  Float  @default(0)
+  tasksCompleted Int    @default(0)
+  totalUptime    BigInt @default(0)
+  errorCount     Int    @default(0)
+  
+  // Meta
+  tags          String[]
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+  startedAt     DateTime?
+  lastSeenAt    DateTime?
+
+  // Relations
+  tasks         Task[]
+  earnings      Earning[]
+  logs          DeviceLog[]
+  screenshots   Screenshot[]
+  proxy         Proxy?   @relation(fields: [proxyId],   references: [id])
+  account       Account? @relation(fields: [accountId], references: [id])
+  group         DeviceGroup? @relation(fields: [groupId], references: [id])
+  installedApps InstalledApp[]
+
+  @@map("devices")
+}
+
+enum DeviceStatus {
+  STOPPED
+  STARTING
+  RUNNING
+  PAUSED
+  RESTARTING
+  ERROR
+  INSTALLING
+}
+
+enum DeviceType {
+  VIRTUAL   // QEMU/Android-x86
+  CLOUD     // Genymotion/Appetize
+  PHYSICAL  // Real device via ADB
+}
+
+// ─── Device Groups ───────────────────────────
+model DeviceGroup {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  color       String   @default("#00e5ff")
+  devices     Device[]
+  createdAt   DateTime @default(now())
+
+  @@map("device_groups")
+}
+
+// ─── Installed Apps per Device ───────────────
+model InstalledApp {
+  id          String   @id @default(uuid())
+  deviceId    String
+  packageName String
+  appName     String
+  version     String?
+  installedAt DateTime @default(now())
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, packageName])
+  @@map("installed_apps")
+}
+
+// ─── Accounts ────────────────────────────────
+model Account {
+  id          String   @id @default(uuid())
+  name        String?
+  email       String
+  username    String?
+  password    String   // encrypted
+  platform    String   // youtube, swagbucks, etc.
+  
+  // Status
+  status      AccountStatus @default(ACTIVE)
+  lastLoginAt DateTime?
+  
+  // Balance / Points
+  balance     Float    @default(0)
+  points      Int      @default(0)
+  currency    String   @default("USD")
+  
+  // 2FA
+  twoFactorSecret String?
+  backupCodes     String[]
+  
+  // Cookies / Session
+  sessionData String?  // JSON
+  cookiesData String?  // JSON
+  
+  // Stats
+  totalEarned Float    @default(0)
+  loginCount  Int      @default(0)
+  
+  // Meta
+  notes       String?
+  tags        String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  devices     Device[]
+  tasks       Task[]
+  earnings    Earning[]
+
+  @@unique([email, platform])
+  @@map("accounts")
+}
+
+enum AccountStatus {
+  ACTIVE
+  BANNED
+  SUSPENDED
+  UNVERIFIED
+  EXPIRED
+}
+
+// ─── Proxies ─────────────────────────────────
+model Proxy {
+  id          String    @id @default(uuid())
+  name        String?
+  host        String
+  port        Int
+  protocol    ProxyProtocol @default(HTTP)
+  username    String?
+  password    String?
+  
+  // Location
+  country     String?
+  city        String?
+  countryCode String?
+  
+  // Status
+  status      ProxyStatus  @default(UNTESTED)
+  latency     Int?         // ms
+  lastTestedAt DateTime?
+  lastError   String?
+  
+  // Stats
+  bandwidth   Float   @default(0) // GB
+  uptime      Float   @default(0) // percentage
+  
+  // Meta
+  provider    String?
+  tags        String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  devices     Device[]
+  tasks       Task[]
+
+  @@unique([host, port])
+  @@map("proxies")
+}
+
+enum ProxyProtocol {
+  HTTP
+  HTTPS
+  SOCKS4
+  SOCKS5
+}
+
+enum ProxyStatus {
+  UNTESTED
+  ACTIVE
+  SLOW
+  FAILED
+  BANNED
+}
+
+// ─── Tasks / Automation ──────────────────────
+model Task {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  
+  // What to do
+  appKey      String     // youtube, swagbucks, etc.
+  action      String     // watch_video, complete_survey, etc.
+  config      Json?      // action-specific config
+  
+  // Target
+  deviceId    String?
+  accountId   String?
+  proxyId     String?
+  groupId     String?    // assign to all devices in group
+  
+  // Schedule
+  scheduleType ScheduleType @default(ONCE)
+  cronExpression String?
+  scheduledAt DateTime?
+  
+  // Priority & retries
+  priority    Int     @default(5)
+  maxRetries  Int     @default(3)
+  retryCount  Int     @default(0)
+  timeout     Int     @default(300) // seconds
+  
+  // Status
+  status      TaskStatus  @default(PENDING)
+  progress    Float       @default(0)
+  statusMessage String?
+  
+  // Results
+  result      Json?
+  error       String?
+  earnings    Float   @default(0)
+  
+  // Timing
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  device      Device?  @relation(fields: [deviceId],  references: [id])
+  account     Account? @relation(fields: [accountId], references: [id])
+  proxy       Proxy?   @relation(fields: [proxyId],   references: [id])
+  earnings_rel Earning[]
+  logs        TaskLog[]
+
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  PENDING
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  PAUSED
+  SCHEDULED
+}
+
+enum ScheduleType {
+  ONCE
+  RECURRING
+  CRON
+}
+
+// ─── Earnings / Revenue ──────────────────────
+model Earning {
+  id          String   @id @default(uuid())
+  deviceId    String?
+  accountId   String?
+  taskId      String?
+  
+  amount      Float
+  currency    String   @default("USD")
+  points      Int?
+  
+  appKey      String
+  action      String?
+  
+  earnedAt    DateTime @default(now())
+  confirmedAt DateTime?
+  paidAt      DateTime?
+  
+  status      EarningStatus @default(PENDING)
+  txId        String?  // platform transaction ID
+  notes       String?
+
+  // Relations
+  device      Device?  @relation(fields: [deviceId],  references: [id])
+  account     Account? @relation(fields: [accountId], references: [id])
+  task        Task?    @relation(fields: [taskId],    references: [id])
+
+  @@map("earnings")
+}
+
+enum EarningStatus {
+  PENDING
+  CONFIRMED
+  PAID
+  REJECTED
+}
+
+// ─── APK Library ─────────────────────────────
+model Apk {
+  id          String   @id @default(uuid())
+  name        String
+  packageName String
+  version     String
+  minAndroid  String   @default("5.0")
+  
+  filePath    String
+  fileSize    BigInt
+  fileHash    String?  // MD5
+  
+  category    String?
+  description String?
+  iconPath    String?
+  
+  uploadedAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([packageName, version])
+  @@map("apks")
+}
+
+// ─── Screenshots ─────────────────────────────
+model Screenshot {
+  id          String   @id @default(uuid())
+  deviceId    String
+  taskId      String?
+  
+  filePath    String
+  url         String
+  width       Int
+  height      Int
+  
+  label       String?
+  takenAt     DateTime @default(now())
+
+  device      Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@map("screenshots")
+}
+
+// ─── Device Logs ─────────────────────────────
+model DeviceLog {
+  id        String    @id @default(uuid())
+  deviceId  String
+  level     LogLevel  @default(INFO)
+  message   String
+  data      Json?
+  createdAt DateTime  @default(now())
+
+  device    Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, createdAt])
+  @@map("device_logs")
+}
+
+// ─── Task Logs ───────────────────────────────
+model TaskLog {
+  id        String   @id @default(uuid())
+  taskId    String
+  level     LogLevel @default(INFO)
+  message   String
+  progress  Float?
+  data      Json?
+  createdAt DateTime @default(now())
+
+  task      Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_logs")
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+// ─── Settings ────────────────────────────────
+model Setting {
+  key       String @id
+  value     String
+  type      String @default("string")
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
+
+// ─── Users (Admin) ───────────────────────────
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  password    String
+  name        String?
+  role        UserRole @default(ADMIN)
+  createdAt   DateTime @default(now())
+  lastLoginAt DateTime?
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  OPERATOR
+  VIEWER
+}
