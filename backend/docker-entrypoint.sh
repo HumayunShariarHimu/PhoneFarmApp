@@ -9,5 +9,9 @@ if [ -n "${DATABASE_URL:-}" ]; then
 else
   echo "[!] DATABASE_URL is not configured; starting API without database migration"
 fi
-node src/db/seed.js 2>/dev/null || true
+if [ -n "${DATABASE_URL:-}" ]; then
+  node src/db/seed.js 2>/dev/null || true
+else
+  echo "[!] Skipping database seed because DATABASE_URL is not configured"
+fi
 exec "$@"
