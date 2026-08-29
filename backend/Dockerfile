@@ -41,6 +41,8 @@ RUN mkdir -p /android/images /app/screenshots /app/apks /app/logs
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-EXPOSE 4000 4001
+# Railway generated domain is mapped to 5037 in this service.
+ENV PORT=5037
+EXPOSE 5037 4000 4001
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "src/index.js"]
