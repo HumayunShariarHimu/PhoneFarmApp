@@ -2,8 +2,8 @@
 const nextConfig = {
   reactStrictMode: true,
   env: {
-    NEXT_PUBLIC_API_URL:    process.env.NEXT_PUBLIC_API_URL    || 'http://localhost:4000',
-    NEXT_PUBLIC_WS_URL:     process.env.NEXT_PUBLIC_WS_URL     || 'http://localhost:4000',
+    NEXT_PUBLIC_API_URL:    process.env.NEXT_PUBLIC_API_URL    || 'https://phonefarmapp-production.up.railway.app',
+    NEXT_PUBLIC_WS_URL:     process.env.NEXT_PUBLIC_WS_URL     || 'https://phonefarmapp-production.up.railway.app',
     NEXT_PUBLIC_APP_NAME:   process.env.NEXT_PUBLIC_APP_NAME   || 'PhoneFarmOS',
   },
   images: { domains: ['localhost'] },
@@ -11,7 +11,7 @@ const nextConfig = {
     return [
       {
         source: '/api/backend/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/:path*`,
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'https://phonefarmapp-production.up.railway.app'}/api/:path*`,
       },
     ];
   },
