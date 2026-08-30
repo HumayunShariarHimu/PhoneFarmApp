@@ -28,6 +28,9 @@ class EmulatorManager {
 
   // ─── Create Android VM ────────────────────
   async create(opts = {}) {
+    if (!fs.existsSync(BASE_IMG)) {
+      throw new Error(`Android base image is missing: ${BASE_IMG}. Provision a bootable Android-x86 qcow2 image before creating devices.`);
+    }
     const id   = opts.id   || uuid();
     const name = opts.name || `Phone-${id.slice(0,6).toUpperCase()}`;
     const ram  = opts.ram  || 2048;
@@ -181,8 +184,7 @@ class EmulatorManager {
     if (fs.existsSync(BASE_IMG)) {
       await this._exec(`qemu-img create -f qcow2 -b "${BASE_IMG}" -F qcow2 "${imgPath}"`);
     } else {
-      await this._exec(`qemu-img create -f qcow2 "${imgPath}" 8G`);
-      console.warn('[VM] No base image found. Created blank 8GB disk. Install Android-x86 first.');
+      throw new Error(`Android base image is missing: ${BASE_IMG}. A blank disk cannot boot Android; provision a bootable Android-x86 qcow2 image first.`);
     }
   }
 

@@ -75,7 +75,12 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({ success: true, data: created, message: `${created.length} device(s) created` });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    const unavailable = /base image|KVM|QEMU|ADB/i.test(err.message || '');
+    res.status(unavailable ? 503 : 500).json({
+      success: false,
+      error: err.message,
+      code: unavailable ? 'EMULATOR_RUNTIME_UNAVAILABLE' : 'DEVICE_CREATE_FAILED',
+    });
   }
 });
 
