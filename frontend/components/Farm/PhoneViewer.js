@@ -36,6 +36,9 @@ export default function PhoneViewer({ device, width = 320, onClose }) {
     setError(null);
 
     try {
+      if (device.status !== 'running') {
+        throw new Error(device.error || `Device is ${device.status || 'unavailable'}. Start a connected Android runtime first.`);
+      }
       // 1. Request offer from backend
       const { data } = await streamAPI.getOffer(device.id);
       const { peerId, offer } = data;

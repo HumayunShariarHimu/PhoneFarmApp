@@ -202,9 +202,9 @@ export default function FarmPage() {
           </div>
 
           <div style={{ marginLeft:'auto', display:'flex', gap:6 }}>
-            <button onClick={() => devicesAPI.startAll().then(loadDevices)} style={{ padding:'7px 12px', background:'rgba(0,230,118,.1)', color:'#00e676', border:'1px solid rgba(0,230,118,.25)', borderRadius:7, cursor:'pointer', fontWeight:600, fontSize:12 }}>▶ Start All</button>
-            <button onClick={() => devicesAPI.stopAll().then(loadDevices)}  style={{ padding:'7px 12px', background:'rgba(255,23,68,.1)',  color:'#ff1744', border:'1px solid rgba(255,23,68,.25)',  borderRadius:7, cursor:'pointer', fontWeight:600, fontSize:12 }}>■ Stop All</button>
-            <button onClick={() => setShowCreate(true)} style={btnPrimary}>＋ Add Phones</button>
+            <button disabled={runtime && !runtime.emulatorAvailable} onClick={() => devicesAPI.startAll().then(loadDevices)} style={{ padding:'7px 12px', background:'rgba(0,230,118,.1)', color:'#00e676', border:'1px solid rgba(0,230,118,.25)', borderRadius:7, cursor:runtime && !runtime.emulatorAvailable ? 'not-allowed' : 'pointer', opacity:runtime && !runtime.emulatorAvailable ? .45 : 1, fontWeight:600, fontSize:12 }}>▶ Start All</button>
+            <button onClick={() => devicesAPI.stopAll().then(loadDevices)} style={{ padding:'7px 12px', background:'rgba(255,23,68,.1)', color:'#ff1744', border:'1px solid rgba(255,23,68,.25)', borderRadius:7, cursor:'pointer', fontWeight:600, fontSize:12 }}>■ Stop All</button>
+            <button disabled={runtime && !runtime.emulatorAvailable} onClick={() => setShowCreate(true)} style={{ ...btnPrimary, cursor:runtime && !runtime.emulatorAvailable ? 'not-allowed' : 'pointer', opacity:runtime && !runtime.emulatorAvailable ? .45 : 1 }}>＋ Add Phones</button>
           </div>
         </div>
 
