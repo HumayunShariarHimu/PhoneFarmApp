@@ -25,6 +25,10 @@ api.interceptors.response.use(
 );
 
 // ─── Devices ─────────────────────────────────
+export const runtimeAPI = {
+  status: () => api.get('/runtime'),
+};
+
 export const devicesAPI = {
   list:      (params) => api.get('/devices', { params }),
   get:       (id)     => api.get(`/devices/${id}`),

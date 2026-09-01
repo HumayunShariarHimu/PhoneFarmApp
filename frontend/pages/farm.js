@@ -3,7 +3,7 @@ import Head from 'next/head';
 import Layout from '../components/Layout/Layout';
 import PhoneCard from '../components/Farm/PhoneCard';
 import PhoneViewer from '../components/Farm/PhoneViewer';
-import { devicesAPI, tasksAPI, accountsAPI } from '../lib/api';
+import { devicesAPI, tasksAPI, accountsAPI, runtimeAPI } from '../lib/api';
 import { getSocket, socketActions } from '../lib/socket';
 import toast from 'react-hot-toast';
 
@@ -33,6 +33,7 @@ export default function FarmPage() {
   const [taskForm,    setTaskForm]    = useState({ appKey:'youtube', action:'watch_video', config:'{}' });
   const [accounts,    setAccounts]    = useState([]);
   const [stats,       setStats]       = useState({ total:0, running:0, earnings:0, rate:0 });
+  const [runtime,     setRuntime]     = useState(null);
 
   // Load devices
   const loadDevices = useCallback(async () => {
@@ -52,6 +53,7 @@ export default function FarmPage() {
   }, []);
 
   useEffect(() => {
+    runtimeAPI.status().then(r => setRuntime(r.data || null)).catch(() => setRuntime({ mode:'safe', emulatorAvailable:false, reason:'Backend runtime status unavailable.' }));
     loadDevices();
     accountsAPI.list().then(r => setAccounts(r.data || [])).catch(() => {});
 
@@ -123,6 +125,10 @@ export default function FarmPage() {
   };
 
   const createDevices = async () => {
+    if (runtime && !runtime.emulatorAvailable) {
+      toast.error(runtime.reason || 'Live Android runtime is not configured on this server.');
+      return;
+    }
     try {
       await devicesAPI.create(createForm);
       toast.success(`Creating ${createForm.count} device(s)...`);
@@ -152,7 +158,13 @@ export default function FarmPage() {
   return (
     <>
       <Head><title>Farm Control — PhoneFarmOS</title></Head>
-      <Layout title="Farm Control">
+        <Layout title="Farm Control">
+
+        {runtime && !runtime.emulatorAvailable && (
+          <div style={{ marginBottom:16, padding:'12px 14px', background:'rgba(255,214,0,.08)', border:'1px solid rgba(255,214,0,.28)', borderRadius:10, color:'#ffd600', fontSize:13, lineHeight:1.5 }}>
+            <strong>Safe mode active:</strong> Dashboard, database, Redis and task management are available. Live Android controls require a connected remote runtime. {runtime.reason}
+          </div>
+        )}
 
         {/* Stats bar */}
         <div style={{ display:'flex', gap:0, background:'#0b1120', border:'1px solid #162035', borderRadius:10, overflow:'hidden', marginBottom:16 }}>

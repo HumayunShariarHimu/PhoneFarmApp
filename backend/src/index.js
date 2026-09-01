@@ -51,6 +51,11 @@ app.use('/api/proxies',   proxyRouter);
 app.use('/api/stream',    streamRouter);
 app.use('/api/analytics', analyticsRouter);
 
+// Runtime capability (safe mode / remote Android runtime status)
+app.get('/api/runtime', (req, res) => {
+  res.json({ success: true, data: EmulatorManager.runtimeStatus() });
+});
+
 // Health
 app.get('/health', async (req, res) => {
   const devices = EmulatorManager.getAll();
@@ -60,6 +65,7 @@ app.get('/health', async (req, res) => {
     devices: devices.length,
     running: devices.filter(d => d.status === 'running').length,
     version: '3.0.0',
+    runtime: EmulatorManager.runtimeStatus(),
     ts: new Date().toISOString(),
   });
 });

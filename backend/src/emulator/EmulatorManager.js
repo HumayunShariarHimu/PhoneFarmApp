@@ -11,6 +11,7 @@ const QEMU     = process.env.QEMU_PATH || 'qemu-system-x86_64';
 const ADB_BIN  = process.env.ADB_PATH  || 'adb';
 const BASE_VNC = 5900;
 const BASE_ADB = 5554;
+const RUNTIME_MODE = (process.env.EMULATOR_MODE || 'safe').toLowerCase();
 
 class EmulatorManager {
   constructor() {
@@ -26,8 +27,30 @@ class EmulatorManager {
     console.log('[EmulatorManager] Ready. IMG_DIR:', IMG_DIR);
   }
 
+  runtimeStatus() {
+    const qemuAvailable = (() => {
+      try { return fs.existsSync(QEMU) || require('child_process').execFileSync('which', [QEMU], { stdio: ['ignore', 'pipe', 'ignore'] }).length > 0; } catch { return false; }
+    })();
+    const baseImageAvailable = fs.existsSync(BASE_IMG);
+    const kvmAvailable = fs.existsSync('/dev/kvm');
+    const enabled = RUNTIME_MODE === 'qemu';
+    return {
+      mode: enabled ? 'qemu' : 'safe',
+      emulatorAvailable: enabled && qemuAvailable && baseImageAvailable,
+      qemuAvailable,
+      baseImageAvailable,
+      kvmAvailable,
+      reason: enabled
+        ? (!qemuAvailable ? `QEMU is unavailable: ${QEMU}` : !baseImageAvailable ? `Android base image is missing: ${BASE_IMG}` : 'QEMU runtime ready')
+        : 'Safe mode is enabled; connect a separate Android runtime to control real devices.',
+    };
+  }
+
   // ─── Create Android VM ────────────────────
   async create(opts = {}) {
+    if (RUNTIME_MODE !== 'qemu') {
+      throw new Error('Android emulator runtime is disabled in Railway safe mode. Connect a KVM-enabled remote runtime to create live devices.');
+    }
     if (!fs.existsSync(BASE_IMG)) {
       throw new Error(`Android base image is missing: ${BASE_IMG}. Provision a bootable Android-x86 qcow2 image before creating devices.`);
     }

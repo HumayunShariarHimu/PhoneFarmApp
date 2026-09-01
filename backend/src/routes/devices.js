@@ -75,7 +75,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({ success: true, data: created, message: `${created.length} device(s) created` });
   } catch (err) {
-    const unavailable = /base image|KVM|QEMU|ADB/i.test(err.message || '');
+    const unavailable = /base image|KVM|QEMU|ADB|runtime|remote/i.test(err.message || '');
     res.status(unavailable ? 503 : 500).json({
       success: false,
       error: err.message,
