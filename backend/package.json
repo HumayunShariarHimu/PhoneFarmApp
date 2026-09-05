@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "postinstall": "npx puppeteer browsers install chrome"
   },
   "dependencies": {
     "compression": "^1.7.4",
