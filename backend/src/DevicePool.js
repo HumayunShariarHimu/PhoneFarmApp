@@ -1,8 +1,6 @@
 'use strict';
 
-const puppeteer  = require('puppeteer-extra');
-const Stealth    = require('puppeteer-extra-plugin-stealth');
-puppeteer.use(Stealth());
+const puppeteer = require('puppeteer');
 
 const { v4: uuid } = require('uuid');
 const EventEmitter  = require('events');
