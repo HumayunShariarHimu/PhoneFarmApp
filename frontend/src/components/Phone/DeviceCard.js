@@ -33,6 +33,7 @@ export default function DeviceCard({ device, selected, onSelect, onOpen, onActio
       onClick={() => onOpen(device)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className="device-card"
       style={{
         background:'#0b1120',
         border:`1px solid ${selected ? '#00e5ff' : hovered ? 'rgba(0,229,255,.2)' : '#162035'}`,
@@ -46,6 +47,11 @@ export default function DeviceCard({ device, selected, onSelect, onOpen, onActio
       {/* Select checkbox */}
       <div
         onClick={e => { e.stopPropagation(); onSelect(device.id); }}
+        className="device-select"
+        role="checkbox"
+        aria-checked={selected}
+        aria-label={`Select ${device.name || device.model}`}
+        title={selected ? 'Deselect device' : 'Select device'}
         style={{ position:'absolute', top:5, left:5, zIndex:10, width:16, height:16, borderRadius:3, border:`1px solid ${selected?'#00e5ff':'rgba(255,255,255,.15)'}`, background:selected?'#00e5ff':'rgba(0,0,0,.55)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#000', cursor:'pointer', fontWeight:900 }}
       >
         {selected && '✓'}
@@ -86,9 +92,9 @@ export default function DeviceCard({ device, selected, onSelect, onOpen, onActio
 
         {/* Nav bar */}
         <div style={{ position:'absolute', bottom:0, left:0, right:0, height:14, background:'rgba(0,0,0,.6)', zIndex:2, display:'flex', alignItems:'center', justifyContent:'center', gap:14, fontSize:9, color:'rgba(255,255,255,.55)' }}>
-          <span onClick={e=>{e.stopPropagation();ctrl.back(device.id)}} style={{ cursor:'pointer' }}>◁</span>
-          <span onClick={e=>{e.stopPropagation();ctrl.goto(device.id,'https://www.google.com')}} style={{ cursor:'pointer' }}>●</span>
-          <span style={{ cursor:'pointer' }}>◻</span>
+          <button className="device-nav-action" aria-label="Go back" title="Go back" onClick={e=>{e.stopPropagation();ctrl.back(device.id)}} style={{ cursor:'pointer', background:'none', border:'none', color:'inherit', padding:0 }}>◁</button>
+          <button className="device-nav-action" aria-label="Open home page" title="Open home page" onClick={e=>{e.stopPropagation();ctrl.goto(device.id,'https://www.google.com')}} style={{ cursor:'pointer', background:'none', border:'none', color:'inherit', padding:0 }}>●</button>
+          <button className="device-nav-action" aria-label="Recent apps" title="Recent apps" onClick={e=>e.stopPropagation()} style={{ cursor:'pointer', background:'none', border:'none', color:'inherit', padding:0 }}>◻</button>
         </div>
       </div>
 
@@ -105,7 +111,7 @@ export default function DeviceCard({ device, selected, onSelect, onOpen, onActio
           </div>
         </div>
 
-        <div style={{ fontSize:9, color:'#3a4560', display:'flex', gap:8, marginBottom:5 }}>
+        <div className="device-meta" style={{ fontSize:9, color:'#3a4560', display:'flex', gap:8, marginBottom:5 }}>
           <span>Android {device.android}</span>
           <span>{device.width}×{device.height}</span>
           <span>{device.ram}</span>
@@ -117,11 +123,11 @@ export default function DeviceCard({ device, selected, onSelect, onOpen, onActio
             style={{ flex:1, padding:'4px 0', background:isRunning?'rgba(255,23,68,.1)':'rgba(0,230,118,.1)', color:isRunning?'#ff1744':'#00e676', border:`1px solid ${isRunning?'rgba(255,23,68,.2)':'rgba(0,230,118,.2)'}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:700 }}>
             {isRunning ? '■ Stop' : '▶ Start'}
           </button>
-          <button onClick={e=>{e.stopPropagation(); onAction(device.id,'screenshot')}}
+          <button className="device-icon-action" aria-label={`Take screenshot of ${device.name || device.model}`} title="Take screenshot" onClick={e=>{e.stopPropagation(); onAction(device.id,'screenshot')}}
             style={{ width:28, padding:'4px 0', background:'rgba(255,255,255,.04)', border:'1px solid #162035', borderRadius:5, cursor:'pointer', fontSize:11, color:'#6b7e99' }}>
             📸
           </button>
-          <button onClick={e=>{e.stopPropagation(); onAction(device.id,'remove')}}
+          <button className="device-icon-action" aria-label={`Remove ${device.name || device.model}`} title="Remove device" onClick={e=>{e.stopPropagation(); onAction(device.id,'remove')}}
             style={{ width:28, padding:'4px 0', background:'rgba(255,255,255,.04)', border:'1px solid #162035', borderRadius:5, cursor:'pointer', fontSize:11, color:'#6b7e99' }}>
             🗑
           </button>

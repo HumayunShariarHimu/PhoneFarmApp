@@ -124,13 +124,21 @@ export default function Home() {
           .header-search { order:3; flex-basis:100%; max-width:none !important; }
           .header-actions { gap:4px !important; }
           .header-actions > div:first-child { max-width:120px; overflow:hidden; }
-          .header-actions > button { padding:7px 9px !important; }
+          .header-actions > button { padding:7px 9px !important; min-height:36px; }
           .toolbar { align-items:stretch !important; }
           .toolbar > select { flex:1; min-width:calc(50% - 4px); }
           .toolbar-actions { width:100%; }
-          .toolbar-actions > button { flex:1; min-width:0; }
+          .toolbar-actions > button { flex:1; min-width:0; min-height:36px; }
           .device-grid { grid-template-columns:repeat(2, minmax(0, 1fr)) !important; gap:8px !important; }
+          .brand-picker { display:grid !important; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px !important; }
+          .brand-picker > button { min-height:38px; }
+          .device-card .device-select { width:28px !important; height:28px !important; top:3px !important; left:3px !important; }
+          .device-card .device-icon-action { width:36px !important; min-height:34px; }
+          .device-card .device-nav-action { min-width:26px; min-height:24px; }
+          .device-card .device-meta { flex-wrap:wrap; gap:4px 8px !important; }
           .modal-shell, .viewer-shell { width:100% !important; max-width:100% !important; max-height:calc(100vh - 16px) !important; padding:14px !important; border-radius:12px !important; }
+          .modal-shell h3 { font-size:1rem; }
+          .modal-shell input, .modal-shell select, .modal-shell textarea { min-height:40px; }
           .form-grid { grid-template-columns:1fr !important; gap:10px !important; }
           .modal-footer { flex-direction:column-reverse !important; }
           .modal-footer > button { width:100%; }
@@ -221,10 +229,14 @@ export default function Home() {
           {/* Device Grid */}
           {filtered.length === 0 ? (
             <div style={{ textAlign:'center', padding:'80px 20px', color:st.t3 }}>
-              <div style={{ fontSize:48, marginBottom:14, opacity:.3 }}>📵</div>
-              <div style={{ fontSize:16, marginBottom:6 }}>No virtual devices</div>
-              <div style={{ fontSize:13, marginBottom:20 }}>Add your first virtual Android phone</div>
-              <button onClick={() => setShowAdd(true)} style={{ padding:'10px 24px', background:st.cyan, color:'#000', border:'none', borderRadius:9, fontWeight:800, cursor:'pointer', fontSize:13 }}>＋ Add Device</button>
+              <div style={{ fontSize:48, marginBottom:14, opacity:.3 }}>{devices.length ? '⌕' : '📵'}</div>
+              <div style={{ fontSize:16, marginBottom:6 }}>{devices.length ? 'No matching devices' : 'No virtual devices'}</div>
+              <div style={{ fontSize:13, marginBottom:20 }}>{devices.length ? 'Try clearing your search or filters' : 'Add your first virtual Android phone'}</div>
+              {devices.length ? (
+                <button onClick={() => { setSrch(''); setFBrand('all'); setFStatus('all'); }} style={{ padding:'10px 24px', background:st.dark, color:st.cyan, border:`1px solid ${st.cyan}40`, borderRadius:9, fontWeight:800, cursor:'pointer', fontSize:13 }}>Clear filters</button>
+              ) : (
+                <button onClick={() => setShowAdd(true)} style={{ padding:'10px 24px', background:st.cyan, color:'#000', border:'none', borderRadius:9, fontWeight:800, cursor:'pointer', fontSize:13 }}>＋ Add Device</button>
+              )}
             </div>
           ) : (
             <div className="device-grid" style={{ display:'grid', gridTemplateColumns:colsMap[viewMode], gap: viewMode==='compact'?6:10 }}>
@@ -313,9 +325,9 @@ export default function Home() {
               {/* Brand picker */}
               <div style={{ marginBottom:14 }}>
                 <label style={{ fontSize:11, color:st.t2, display:'block', marginBottom:6 }}>Brand</label>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                <div className="brand-picker" style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
                   {BRAND_LIST.map(b => (
-                    <button key={b.key} onClick={() => { setAddForm(f=>({...f, brand:b.key, model:BRANDS[b.key].models[0].model, android:BRANDS[b.key].models[0].android})); }}
+                    <button key={b.key} aria-pressed={addForm.brand===b.key} title={`Select ${b.name}`} onClick={() => { setAddForm(f=>({...f, brand:b.key, model:BRANDS[b.key].models[0].model, android:BRANDS[b.key].models[0].android})); }}
                       style={{ padding:'6px 10px', background: addForm.brand===b.key ? b.color+'22' : '#111d2e', border:`1px solid ${addForm.brand===b.key ? b.color : st.border}`, borderRadius:6, color: addForm.brand===b.key ? b.color : st.t2, cursor:'pointer', fontSize:11, fontWeight: addForm.brand===b.key ? 700 : 400 }}>
                       {b.logo} {b.name}
                     </button>
