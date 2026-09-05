@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: vpfarm-backend
+    env: node
+    buildCommand: npm install
+    startCommand: node index.js
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 4000
+      - key: NODE_ENV
+        value: production
+      - key: MAX_ACTIVE
+        value: 3
+      - key: PUPPETEER_EXEC
+        value: /usr/bin/google-chrome-stable
+      - key: FRONTEND_URL
+        sync: false

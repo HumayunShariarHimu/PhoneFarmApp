@@ -1,19 +1,11 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  reactStrictMode: true,
+module.exports = {
+  reactStrictMode: false,
   env: {
-    NEXT_PUBLIC_API_URL:    process.env.NEXT_PUBLIC_API_URL    || 'https://phonefarmapp-production.up.railway.app',
-    NEXT_PUBLIC_WS_URL:     process.env.NEXT_PUBLIC_WS_URL     || 'https://phonefarmapp-production.up.railway.app',
-    NEXT_PUBLIC_APP_NAME:   process.env.NEXT_PUBLIC_APP_NAME   || 'PhoneFarmOS',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000',
+    NEXT_PUBLIC_WS_URL:  process.env.NEXT_PUBLIC_WS_URL  || 'http://localhost:4000',
+    NEXT_PUBLIC_MAX_ACTIVE: process.env.NEXT_PUBLIC_MAX_ACTIVE || '3',
   },
-  images: { domains: ['localhost'] },
-  async rewrites() {
-    return [
-      {
-        source: '/api/backend/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'https://phonefarmapp-production.up.railway.app'}/api/:path*`,
-      },
-    ];
-  },
+  // Vercel/Next.js pages directory setting
+  pageExtensions: ['js','jsx'],
 };
-module.exports = nextConfig;

@@ -1,255 +1,183 @@
-# ⌬ PhoneFarmOS v3 — Real Android Phone Farm
+# ⌬ Virtual Phone Farm v3
 
-> **সত্যিকারের ভার্চুয়াল ফোন ফার্মিং সিস্টেম**
-> QEMU Android-x86 emulators + ADB automation + WebRTC live streaming
-
----
-
-## Architecture
-
-```
-Browser (Vercel)          Backend (Railway/VPS)
-┌─────────────────┐      ┌────────────────────────────────┐
-│  Next.js UI     │◄────►│  Node.js + Express + Socket.IO │
-│  WebRTC viewer  │      │                                │
-│  Live screen    │      │  ┌─────────────────────────┐   │
-│  Click → ADB   │      │  │  Android-x86 VM (QEMU)  │   │
-│  Task control  │      │  │  ├── ADB control         │   │
-│  Account mgmt  │      │  │  ├── VNC screen          │   │
-│  Proxy mgmt    │      │  │  └── WebRTC stream       │   │
-└─────────────────┘      │  └─────────────────────────┘   │
-                          │  ×N (up to 50 VMs)             │
-                          │                                │
-                          │  PostgreSQL (DB)               │
-                          │  Redis (Task Queue)            │
-                          │  Puppeteer (Web automation)    │
-                          └────────────────────────────────┘
-```
+> ভার্চুয়াল Android ফোন ফার্ম — Samsung, Xiaomi, Vivo, Realme, Symphony সহ ২০০+ মডেল
+> বাস্তব ফোন ফার্মিং এর মতো — tap, swipe, URL open, JS run, batch control
 
 ---
 
-## Quick Start (Local)
+## 🎯 এটা কী করে?
 
-### Prerequisites
-- Docker + Docker Compose
-- Linux host with KVM support (`/dev/kvm`)
-- 16GB+ RAM recommended (2GB per emulator)
-
-### 1. Clone & Configure
-```bash
-git clone https://github.com/YOUR/real-phone-farm.git
-cd real-phone-farm
-
-# Copy env files
-cp backend/.env.example backend/.env
-# Edit backend/.env with your settings
-
-cp frontend/.env.example frontend/.env.local
-# Set NEXT_PUBLIC_API_URL=http://localhost:4000
+```
+Browser এ দেখো ─────────────────────────────────────────┐
+│  Samsung A54 │  Xiaomi Note 13 │  Symphony Z55 │  ...  │
+│  [Live Screen│  [Live Screen]  │  [Live Screen]│       │
+│  Tap করো    │  Swipe করো     │  URL open করো│       │
+└─────────────────────────────────────────────────────────┘
+           ↕ Socket.IO (real-time)
+     Backend (Render) ── Puppeteer browser instances
 ```
 
-### 2. Download Android-x86 Image
-```bash
-# Download Android-x86 9.0
-wget https://sourceforge.net/projects/android-x86/files/Release%209.0/android-x86_64-9.0-r2.iso
-
-# Create base disk image
-qemu-img create -f qcow2 /android/base/android-x86-9.0.img 8G
-
-# Install Android to disk (run once)
-qemu-system-x86_64 \
-  -enable-kvm -m 2048 -smp 2 \
-  -hda /android/base/android-x86-9.0.img \
-  -cdrom android-x86_64-9.0-r2.iso \
-  -boot d -vga std
-```
-
-### 3. Start Full Stack
-```bash
-docker-compose up -d
-```
-
-### 4. Access
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:4000
-- **Health**: http://localhost:4000/health
+প্রতিটা ভার্চুয়াল ফোন = একটা headless Chrome browser
+- Real website দেখায় (live screenshot streaming)
+- Click করলে → Puppeteer tap করে
+- Swipe করলে → Puppeteer swipe করে
+- URL দিলে → সেই site opens
+- Batch: সব ফোনে একসাথে একই কাজ
 
 ---
 
-## Deploy to Production
+## 🚀 Deploy — মোবাইল থেকে (৫ ধাপ)
 
-### Backend → Railway
-```bash
-cd backend
-railway login
-railway init
-railway up
+### ধাপ ১ — GitHub Repo তৈরি ও Upload
 
-# Set env vars in Railway dashboard:
-# DATABASE_URL, REDIS_URL, JWT_SECRET, FRONTEND_URL
+1. **github.com** → New Repository → `virtual-phone-farm`
+2. ZIP extract করো
+3. **frontend/** ও **backend/** ফোল্ডার আলাদাভাবে upload করো
+   - Add file → Upload files → Drag & Drop করো
+
+### ধাপ ২ — Render এ Backend Deploy
+
+1. **render.com** → New → Web Service
+2. GitHub: `virtual-phone-farm` → Root: `backend`
+3. Build: `npm install`
+4. Start: `node index.js`
+5. Environment Variables:
+   ```
+   PORT          = 4000
+   NODE_ENV      = production
+   MAX_ACTIVE    = 3
+   ```
+6. **Deploy** → URL পাবে: `https://vpfarm-backend.onrender.com`
+
+> ⚠️ Render Free tier এ Puppeteer chromium automatically install হবে।
+> যদি না হয়, environment variable দাও:
+> `PUPPETEER_EXEC = /usr/bin/google-chrome-stable`
+
+### ধাপ ৩ — Vercel এ Frontend Deploy
+
+1. **vercel.com** → Add New Project
+2. GitHub: `virtual-phone-farm` → Root: `frontend`
+3. Framework: **Next.js**
+4. Environment Variables:
+   ```
+   NEXT_PUBLIC_API_URL = https://vpfarm-backend.onrender.com
+   NEXT_PUBLIC_WS_URL  = https://vpfarm-backend.onrender.com
+   ```
+5. **Deploy** → URL পাবে: `https://vpfarm.vercel.app`
+
+### ধাপ ৪ — Render এ Backend URL Update
+
+Render → backend → Environment → যোগ করো:
 ```
-
-### Frontend → Vercel
-```bash
-cd frontend
-vercel --prod
-
-# Set env vars in Vercel dashboard:
-# NEXT_PUBLIC_API_URL = https://your-backend.railway.app
-# NEXT_PUBLIC_WS_URL  = https://your-backend.railway.app
+FRONTEND_URL = https://vpfarm.vercel.app
 ```
+Redeploy করো।
 
-### Database → Railway PostgreSQL
-```bash
-# Add PostgreSQL service in Railway
-# Copy DATABASE_URL to backend env vars
-railway run npm run db:migrate
-railway run npm run db:seed
-```
+### ধাপ ৫ — ব্যবহার শুরু!
+
+1. `https://vpfarm.vercel.app` খোলো
+2. **＋ Add** → Brand বাছো → Model → Count → Add
+3. Device card এ ক্লিক করো → Full screen control
+4. যেকোনো website open করো
+5. Tap, swipe, type করো
 
 ---
 
-## Features
+## 📱 ফোন মডেল সমূহ
 
-### 📱 Farm Control
-- **Real Android-x86 VMs** via QEMU/KVM
-- **Live WebRTC screen** in browser (click anywhere → ADB tap)
-- Full gesture support: tap, double-tap, long press, swipe
-- Keyboard input forwarded to Android
-- Start/Stop/Restart VMs from browser
-- Bulk operations on all phones
-
-### 🤖 Real Automation
-- **YouTube**: Watch videos, skip ads, like, subscribe
-- **Swagbucks**: SBTV videos, surveys, daily search
-- **Honeygain**: Passive bandwidth sharing
-- **Mistplay**: Game session automation
-- **Puppeteer**: Web-based app automation (fallback)
-- Custom config per task (duration, targets, etc.)
-
-### 📦 APK Management
-- Install any APK on any emulator
-- APK library management
-- Bulk install across all phones
-
-### 👤 Account Manager
-- Multi-platform account storage (encrypted passwords)
-- Bulk import (email:password:platform)
-- Status tracking (active/banned)
-- Balance & points tracking
-
-### 🌐 Proxy Manager
-- Per-device proxy assignment
-- Bulk import (host:port:user:pass)
-- Automatic proxy testing
-- Country/protocol filtering
-
-### 📊 Analytics
-- Real-time earnings tracking
-- 7-day/30-day charts
-- Per-app breakdown
-- Device performance metrics
+| Brand | মডেল সংখ্যা |
+|-------|-------------|
+| Samsung | Galaxy S24, A55, M55, Note 20 সহ ৩০+ |
+| Xiaomi/Redmi/POCO | Note 13 Pro+, F5, X6 সহ ৩০+ |
+| Vivo | V30, Y200, X100 সহ ১৬+ |
+| Realme | GT 6, 13 Pro+, C67 সহ ১৮+ |
+| Symphony | Z60, H200, E78, V142 সহ ২০+ |
+| OPPO | Reno 12, Find X7 সহ ১১+ |
+| OnePlus | 12, Nord 4 সহ ৮+ |
+| Google Pixel | 9 Pro, 8, 7a সহ ৯+ |
+| Motorola | Edge 50, G84 সহ ৯+ |
+| Tecno | Camon 30, Spark 20 সহ ৮+ |
+| Infinix | Note 40, Hot 40 সহ ৮+ |
+| itel, Nokia | বিভিন্ন মডেল |
+| **মোট** | **২০০+ মডেল** |
 
 ---
 
-## API Reference
+## ⚡ Features
 
-### Devices
-```bash
-GET    /api/devices              # List all
-POST   /api/devices              # Create VM(s)
-GET    /api/devices/:id          # Get one
-DELETE /api/devices/:id          # Delete
-POST   /api/devices/:id/action   # Execute action
-POST   /api/devices/:id/install  # Install APK
+### Device Grid
+- সব ভার্চুয়াল ফোন একসাথে দেখা
+- Live screenshot প্রতি ৮০০ms
+- Brand/Status/Search filter
+- Grid/Compact view
 
-# Actions:
-# tap, swipe, type, keyevent, back, home, recents
-# shell, launch_app, stop_app, open_url, screenshot
-# set_proxy, clear_proxy, set_location, reboot, unlock
+### Device Control (ক্লিক করলে full screen)
+- **Tap** — স্ক্রিনে যেকোনো জায়গায় click
+- **Double Tap** — দুইবার click
+- **Long Press** — right-click করো
+- **Swipe** — touch drag করো
+- **Type** — কীবোর্ড type
+- **URL bar** — যেকোনো website open
+- **Back/Forward/Reload**
+- **Scroll Up/Down**
+- **Quick apps** — YouTube, Instagram, TikTok, etc.
+
+### Batch Operations
+- সব ফোনে একই URL open
+- সব ফোনে একই text type
+- সব ফোনে JS code চালাও
+- Start All / Stop All / Remove All
+
+### Device Management
+- Brand + Model + Android version বেছে add করো
+- Groups (Group A, Group B, etc.)
+- ১-২০টা একসাথে add করো
+
+---
+
+## ⚠️ Free Tier সীমাবদ্ধতা
+
+| বিষয় | Render Free |
+|-------|-------------|
+| একসাথে active ফোন | ৩টা (RAM limit) |
+| RAM | 512MB |
+| Sleep after | ১৫ মিনিট idle |
+| Screenshot delay | ~800ms |
+
+**Render sleep problem solution:**
+UptimeRobot (free) দিয়ে প্রতি ৫ মিনিটে ping করো:
+- uptimerobot.com → New Monitor
+- URL: `https://vpfarm-backend.onrender.com/health`
+- Interval: 5 minutes
+
+**বেশি ফোন চাইলে:**
+Render Pro ($7/mo) → 1GB RAM → ৫-৬টা active
+Render Standard ($25/mo) → 2GB RAM → ১০-১৫টা active
+
+---
+
+## 🔧 Technical Stack
+
 ```
-
-### Tasks
-```bash
-GET    /api/tasks                # List tasks
-POST   /api/tasks                # Create task
-POST   /api/tasks/:id/cancel     # Cancel
-POST   /api/tasks/:id/retry      # Retry failed
-DELETE /api/tasks/:id            # Delete
-```
-
-### Stream (WebRTC)
-```bash
-POST   /api/stream/offer         # Get WebRTC offer
-POST   /api/stream/answer        # Send answer
-POST   /api/stream/ice           # ICE candidate
-DELETE /api/stream/:peerId       # Stop stream
+Frontend:  Next.js 14 → Vercel (Free)
+Backend:   Node.js + Express → Render (Free)
+Real-time: Socket.IO (WebSocket)
+Phones:    Puppeteer (headless Chrome)
+Screen:    JPEG screenshot stream (base64)
 ```
 
 ---
 
-## WebSocket Events
+## 📞 সমস্যা হলে
 
-```javascript
-// Control phone
-socket.emit('device:tap',       { deviceId, x, y })
-socket.emit('device:swipe',     { deviceId, x1, y1, x2, y2, duration })
-socket.emit('device:type',      { deviceId, text })
-socket.emit('device:keyevent',  { deviceId, keycode })
-socket.emit('device:shell',     { deviceId, command })
-socket.emit('device:launch_app',{ deviceId, packageName })
-socket.emit('device:open_url',  { deviceId, url })
-socket.emit('device:screenshot',{ deviceId })
+**Backend connect হচ্ছে না:**
+- Render logs চেক করো
+- CORS error → FRONTEND_URL ঠিক আছে কিনা দেখো
 
-// Emulator lifecycle
-socket.emit('emulator:create',   options)
-socket.emit('emulator:stop',     { deviceId })
-socket.emit('emulator:restart',  { deviceId })
+**Phone screen দেখা যাচ্ছে না:**
+- Phone start করো (▶ Start বোতাম)
+- Render এ Puppeteer install হয়েছে কিনা logs দেখো
 
-// WebRTC streaming
-socket.emit('webrtc:request_stream', { deviceId })
-socket.emit('webrtc:answer',    { deviceId, peerId, answer })
-
-// Receive events
-socket.on('farm:devices:update',   devices => {})
-socket.on('emulator:started',      { id, name, status } => {})
-socket.on('task:progress',         { taskId, progress } => {})
-socket.on('task:completed',        { taskId, result } => {})
-socket.on('device:screenshot:done',{ deviceId, url } => {})
-socket.on('metrics:update',        updates => {})
-```
-
----
-
-## Scaling
-
-### Multiple emulators
-```bash
-# Each emulator uses:
-# - 2GB RAM (configurable)
-# - 2 CPU cores (configurable)
-# - 1 VNC port (5900+slot)
-# - 1 ADB port (5554+slot*2)
-# - 8GB disk space
-
-# For 10 emulators: ~20GB RAM, 20 CPUs
-# Recommended: VPS with 32GB RAM, 8-core CPU
-```
-
-### Cloud alternatives
-```bash
-# If no KVM available, use Appetize.io or Genymotion
-# Set in backend/.env:
-APPETIZE_API_KEY=your_key_here
-```
-
----
-
-## ⚠️ Legal Notice
-
-This tool is for:
-✅ App testing and QA automation
-✅ Research and education
-✅ Testing your own applications
-
-Always comply with platform Terms of Service.
+**Queued দেখাচ্ছে:**
+- Free tier এ max ৩টা active — স্বাভাবিক
+- বেশি চাইলে Render Pro নাও

@@ -2,6 +2,10 @@
   "version": 2,
   "framework": "nextjs",
   "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install"
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "env": {
+    "NEXT_PUBLIC_API_URL": "@backend_url",
+    "NEXT_PUBLIC_WS_URL":  "@backend_url"
+  }
 }
