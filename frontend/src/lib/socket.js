@@ -1,7 +1,7 @@
 // socket.js
 import { io } from 'socket.io-client';
 
-const WS = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:4000';
+const WS = process.env.NEXT_PUBLIC_WS_URL || 'https://vpfarm-backend.onrender.com';
 let socket = null;
 
 export function getSocket() {
