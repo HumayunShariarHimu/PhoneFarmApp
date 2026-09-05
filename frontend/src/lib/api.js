@@ -9,6 +9,7 @@ export const devicesAPI = {
   list:       ()              => api.get('/devices'),
   get:        (id)            => api.get(`/devices/${id}`),
   add:        (data)          => api.post('/devices', data),
+  create:     (data)          => api.post('/devices', data),
   remove:     (id)            => api.delete(`/devices/${id}`),
   action:     (id, action, p) => api.post(`/devices/${id}/action`, { action, ...p }),
   goto:       (id, url)       => api.post(`/devices/${id}/goto`, { url }),

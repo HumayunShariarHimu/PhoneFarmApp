@@ -23,7 +23,9 @@ export default function Home() {
   const [addForm,  setAddForm]  = useState({ brand:'samsung', model:'Galaxy A54 5G', android:'13', count:1, group:'Default', name:'' });
   const [batchUrl, setBatchUrl] = useState('');
   const [batchCode,setBatchCode]= useState('');
-  const [activeTab,setActiveTab]= useState('url');
+  const [activeTab,setActiveTab]=useState('url');
+  const [savingAdd, setSavingAdd] = useState(false);
+  const [notice, setNotice] = useState('');
 
   // Load devices & subscribe to updates
   useEffect(() => {
@@ -35,8 +37,10 @@ export default function Home() {
     sock.on('farm:stats',   (s)  => setStats(s||{}));
     sock.on('device:added', ()   => devicesAPI.list().then(r => { setDevices(r.data||[]); setStats(r.stats||{}); }).catch(() => {}));
     sock.on('device:removed',()  => devicesAPI.list().then(r => { setDevices(r.data||[]); setStats(r.stats||{}); }).catch(() => {}));
+    const onDeviceError = ({ error } = {}) => setNotice(error || 'Backend could not create the device.');
+    sock.on('device:error', onDeviceError);
 
-    return () => { sock.off('farm:state'); sock.off('farm:devices'); sock.off('farm:stats'); sock.off('device:added'); sock.off('device:removed'); };
+    return () => { sock.off('farm:state'); sock.off('farm:devices'); sock.off('farm:stats'); sock.off('device:added'); sock.off('device:removed'); sock.off('device:error', onDeviceError); };
   }, []);
 
   // Filtered devices
@@ -59,26 +63,39 @@ export default function Home() {
   };
 
   // Add devices
-  const addDevices = () => {
+  const addDevices = async () => {
     const m = ALL_MODELS.find(m => m.brand === BRANDS[addForm.brand]?.name && m.model === addForm.model);
     const base = {
       brand:   BRANDS[addForm.brand]?.name || 'Samsung',
       model:   addForm.model,
       android: addForm.android,
-      group:   addForm.group,
+      group:   addForm.group || 'Default',
       width:   m?.width  || 393,
       height:  m?.height || 851,
       ram:     m?.ram    || '6GB',
       cpu:     m?.cpu    || 'Unknown',
       userAgent: m?.userAgent,
     };
-    const count = Math.min(parseInt(addForm.count)||1, 20);
+    const count = Math.min(Math.max(parseInt(addForm.count, 10) || 1, 1), 20);
     const list  = Array.from({length:count}, (_,i) => ({
       ...base,
-      name: addForm.name ? (count > 1 ? `${addForm.name} ${i+1}` : addForm.name) : `${base.brand} ${base.model}`,
+      name: addForm.name ? (count > 1 ? `${addForm.name} ${i+1}` : addForm.name) : `${base.brand} ${base.model}${count > 1 ? ` ${i+1}` : ''}`,
     }));
-    ctrl.addMany(list);
-    setShowAdd(false);
+
+    setSavingAdd(true);
+    setNotice('');
+    try {
+      const result = await devicesAPI.create({ devices: list });
+      if (result?.success === false) throw new Error(result.error || 'Device creation failed.');
+      const refreshed = await devicesAPI.list();
+      setDevices(refreshed.data || []);
+      setStats(refreshed.stats || {});
+      setShowAdd(false);
+    } catch (error) {
+      setNotice(error?.error || error?.message || 'Could not connect to the backend.');
+    } finally {
+      setSavingAdd(false);
+    }
   };
 
   // Batch operations
@@ -96,23 +113,53 @@ export default function Home() {
   return (
     <>
       <Head><title>Virtual Phone Farm</title><meta name="viewport" content="width=device-width,initial-scale=1" /></Head>
+      <style jsx global>{`
+        :global(html), :global(body) { margin:0; padding:0; background:#07090f; overflow-x:hidden; }
+        :global(*), :global(*::before), :global(*::after) { box-sizing:border-box; }
+        .app-header { min-width:0; }
+        .header-search { min-width:120px; }
+        .header-actions { min-width:0; }
+        @media (max-width: 720px) {
+          .app-header { height:auto !important; min-height:54px; padding:10px 12px !important; flex-wrap:wrap; }
+          .header-search { order:3; flex-basis:100%; max-width:none !important; }
+          .header-actions { gap:4px !important; }
+          .header-actions > div:first-child { max-width:120px; overflow:hidden; }
+          .header-actions > button { padding:7px 9px !important; }
+          .toolbar { align-items:stretch !important; }
+          .toolbar > select { flex:1; min-width:calc(50% - 4px); }
+          .toolbar-actions { width:100%; }
+          .toolbar-actions > button { flex:1; min-width:0; }
+          .device-grid { grid-template-columns:repeat(2, minmax(0, 1fr)) !important; gap:8px !important; }
+          .modal-shell, .viewer-shell { width:100% !important; max-width:100% !important; max-height:calc(100vh - 16px) !important; padding:14px !important; border-radius:12px !important; }
+          .form-grid { grid-template-columns:1fr !important; gap:10px !important; }
+          .modal-footer { flex-direction:column-reverse !important; }
+          .modal-footer > button { width:100%; }
+          .viewer-shell { overflow-x:hidden !important; overflow-y:auto !important; }
+          .viewer-info { width:100% !important; min-width:0 !important; }
+        }
+        @media (max-width: 420px) {
+          .header-actions > div:first-child { display:none; }
+          .device-grid { grid-template-columns:1fr !important; }
+          .toolbar > select { min-width:100%; }
+        }
+      `}</style>
 
       <div style={{ minHeight:'100vh', background:st.darker, color:st.t1, fontFamily:'system-ui,sans-serif' }}>
 
         {/* TOP BAR */}
-        <header style={{ background:'rgba(7,9,15,.95)', borderBottom:`1px solid ${st.border}`, padding:'0 16px', height:54, display:'flex', alignItems:'center', gap:12, position:'sticky', top:0, zIndex:100, backdropFilter:'blur(12px)' }}>
+        <header className="app-header" style={{ background:'rgba(7,9,15,.95)', borderBottom:`1px solid ${st.border}`, padding:'0 16px', height:54, display:'flex', alignItems:'center', gap:12, position:'sticky', top:0, zIndex:100, backdropFilter:'blur(12px)' }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
             <div style={{ width:30, height:30, background:'linear-gradient(135deg,#00e5ff,#0070ff)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:900, color:'#000' }}>⌬</div>
             <div style={{ fontWeight:800, fontSize:'1rem', color:'#fff', lineHeight:1 }}>VirtualFarm<span style={{ color:st.cyan, fontSize:11, fontWeight:400, marginLeft:4 }}>v3</span></div>
           </div>
 
           {/* Search */}
-          <div style={{ flex:1, maxWidth:280, position:'relative' }}>
+          <div className="header-search" style={{ flex:1, maxWidth:280, position:'relative' }}>
             <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', color:st.t3, fontSize:14, pointerEvents:'none' }}>⌕</span>
             <input value={srch} onChange={e=>setSrch(e.target.value)} placeholder="Search devices..." style={{ ...inp, paddingLeft:30, height:34, fontSize:12 }} />
           </div>
 
-          <div style={{ marginLeft:'auto', display:'flex', gap:6, alignItems:'center' }}>
+          <div className="header-actions" style={{ marginLeft:'auto', display:'flex', gap:6, alignItems:'center' }}>
             {/* Stats pills */}
             <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
               {[['▶',stats.running,st.green],['■',stats.stopped,st.t3],['⏳',stats.queued,'#ff9100'],['⚠',stats.error,st.red]].map(([ic,v,c]) => v > 0 ? (
@@ -131,7 +178,7 @@ export default function Home() {
 
         <div style={{ padding:'14px 16px' }}>
           {/* Filter + controls bar */}
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', marginBottom:12 }}>
+          <div className="toolbar" style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', marginBottom:12 }}>
             <select value={fBrand} onChange={e=>setFBrand(e.target.value)} style={{ ...inp, width:'auto', height:32, fontSize:12, padding:'5px 24px 5px 10px' }}>
               <option value="all">All Brands ({devices.length})</option>
               {BRAND_LIST.map(b => {
@@ -145,13 +192,13 @@ export default function Home() {
             </select>
 
             {/* View mode */}
-            <div style={{ display:'flex', background:st.dark, borderRadius:7, padding:2, border:`1px solid ${st.border}`, gap:1 }}>
+            <div className="view-toggle" style={{ display:'flex', background:st.dark, borderRadius:7, padding:2, border:`1px solid ${st.border}`, gap:1 }}>
               {[['▦','grid'],['⊟','compact']].map(([ic,m])=>(
                 <button key={m} onClick={()=>setViewMode(m)} style={{ width:30, height:28, border:'none', borderRadius:5, background:viewMode===m?st.cyan:'transparent', color:viewMode===m?'#000':st.t3, cursor:'pointer', fontSize:13 }}>{ic}</button>
               ))}
             </div>
 
-            <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+            <div className="toolbar-actions" style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
               <button onClick={selectAll}  style={{ padding:'5px 10px', background:'rgba(0,229,255,.08)', border:`1px solid ${st.cyan}20`, borderRadius:6, color:st.cyan, cursor:'pointer', fontSize:11 }}>☑ All</button>
               <button onClick={clearSel}   style={{ padding:'5px 10px', background:st.dark, border:`1px solid ${st.border}`, borderRadius:6, color:st.t2, cursor:'pointer', fontSize:11 }}>☐ Clear</button>
               <button onClick={() => ctrl.startAll()}  style={{ padding:'5px 10px', background:'rgba(0,230,118,.08)', border:'1px solid rgba(0,230,118,.2)', borderRadius:6, color:st.green, cursor:'pointer', fontSize:11 }}>▶ Start All</button>
@@ -180,7 +227,7 @@ export default function Home() {
               <button onClick={() => setShowAdd(true)} style={{ padding:'10px 24px', background:st.cyan, color:'#000', border:'none', borderRadius:9, fontWeight:800, cursor:'pointer', fontSize:13 }}>＋ Add Device</button>
             </div>
           ) : (
-            <div style={{ display:'grid', gridTemplateColumns:colsMap[viewMode], gap: viewMode==='compact'?6:10 }}>
+            <div className="device-grid" style={{ display:'grid', gridTemplateColumns:colsMap[viewMode], gap: viewMode==='compact'?6:10 }}>
               {filtered.map(d => (
                 <DeviceCard key={d.id} device={d} selected={selected.has(d.id)} onSelect={toggleSel} onOpen={setViewing} onAction={handleAction} />
               ))}
@@ -192,7 +239,7 @@ export default function Home() {
         {viewing && (
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.88)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
             onClick={e => { if(e.target===e.currentTarget) setViewing(null); }}>
-            <div style={{ background:st.dark, border:`1px solid ${st.cyan}30`, borderRadius:16, padding:20, maxHeight:'95vh', overflow:'auto', display:'flex', gap:20, flexWrap:'wrap', alignItems:'flex-start', maxWidth:'90vw' }}>
+            <div className="viewer-shell" style={{ background:st.dark, border:`1px solid ${st.cyan}30`, borderRadius:16, padding:20, maxHeight:'95vh', overflow:'auto', display:'flex', gap:20, flexWrap:'wrap', alignItems:'flex-start', maxWidth:'90vw' }}>
               {/* Device info header */}
               <div style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', paddingBottom:14, borderBottom:`1px solid ${st.border}` }}>
                 <div>
@@ -211,7 +258,7 @@ export default function Home() {
               <PhoneScreen device={viewing} width={280} showControls={true} />
 
               {/* Extended controls */}
-              <div style={{ flex:1, minWidth:240, display:'flex', flexDirection:'column', gap:12 }}>
+              <div className="viewer-info" style={{ flex:1, minWidth:240, display:'flex', flexDirection:'column', gap:12 }}>
                 {/* Quick app launchers */}
                 <div>
                   <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.7px', color:st.t3, marginBottom:8 }}>Quick Open</div>
@@ -257,7 +304,7 @@ export default function Home() {
         {showAdd && (
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.82)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
             onClick={e => e.target===e.currentTarget && setShowAdd(false)}>
-            <div style={{ background:st.dark, border:`1px solid ${st.cyan}30`, borderRadius:16, padding:24, width:480, maxWidth:'95vw', maxHeight:'90vh', overflow:'auto' }}>
+            <div className="modal-shell" style={{ background:st.dark, border:`1px solid ${st.cyan}30`, borderRadius:16, padding:24, width:480, maxWidth:'95vw', maxHeight:'90vh', overflow:'auto' }}>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:20 }}>
                 <h3 style={{ margin:0, color:'#fff' }}>Add Virtual Device</h3>
                 <button onClick={()=>setShowAdd(false)} style={{ background:'none', border:'none', color:st.t2, cursor:'pointer', fontSize:22 }}>✕</button>
@@ -286,7 +333,7 @@ export default function Home() {
                 </select>
               </div>
 
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
+              <div className="form-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
                 <div>
                   <label style={{ fontSize:11, color:st.t2, display:'block', marginBottom:6 }}>Android Version</label>
                   <select value={addForm.android} onChange={e=>setAddForm(f=>({...f,android:e.target.value}))} style={{ ...inp }}>
@@ -314,9 +361,11 @@ export default function Home() {
                 ))}
               </div>
 
-              <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+              {notice && <div style={{ marginBottom:12, padding:'9px 10px', borderRadius:7, background:'rgba(255,23,68,.1)', border:'1px solid rgba(255,23,68,.25)', color:'#ff6b86', fontSize:12 }}>{notice}</div>}
+
+              <div className="modal-footer" style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
                 <button onClick={()=>setShowAdd(false)} style={{ padding:'10px 18px', background:'#111d2e', border:`1px solid ${st.border}`, borderRadius:8, color:st.t2, cursor:'pointer', fontSize:13 }}>Cancel</button>
-                <button onClick={addDevices} style={{ padding:'10px 18px', background:st.cyan, color:'#000', border:'none', borderRadius:8, fontWeight:800, cursor:'pointer', fontSize:13 }}>＋ Add {addForm.count} Device{addForm.count>1?'s':''}</button>
+                <button onClick={addDevices} disabled={savingAdd} style={{ padding:'10px 18px', background:savingAdd?'#31505a':st.cyan, color:savingAdd?st.t2:'#000', border:'none', borderRadius:8, fontWeight:800, cursor:savingAdd?'wait':'pointer', fontSize:13 }}>{savingAdd ? '⏳ Creating…' : `＋ Add ${addForm.count} Device${addForm.count>1?'s':''}`}</button>
               </div>
             </div>
           </div>
@@ -326,7 +375,7 @@ export default function Home() {
         {showBatch && (
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.82)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
             onClick={e => e.target===e.currentTarget && setShowBatch(false)}>
-            <div style={{ background:st.dark, border:`1px solid ${st.cyan}30`, borderRadius:16, padding:24, width:480, maxWidth:'95vw' }}>
+            <div className="modal-shell" style={{ background:st.dark, border:`1px solid ${st.cyan}30`, borderRadius:16, padding:24, width:480, maxWidth:'95vw' }}>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:20 }}>
                 <h3 style={{ margin:0, color:'#fff' }}>Batch Operation</h3>
                 <button onClick={()=>setShowBatch(false)} style={{ background:'none', border:'none', color:st.t2, cursor:'pointer', fontSize:22 }}>✕</button>
@@ -343,7 +392,7 @@ export default function Home() {
               {activeTab==='type' && <div><label style={{ fontSize:11, color:st.t2, display:'block', marginBottom:6 }}>Text to type on all devices</label><input value={batchUrl} onChange={e=>setBatchUrl(e.target.value)} placeholder="Hello world" style={{ ...inp }} /></div>}
               {activeTab==='code' && <div><label style={{ fontSize:11, color:st.t2, display:'block', marginBottom:6 }}>JavaScript to run on all pages</label><textarea value={batchCode} onChange={e=>setBatchCode(e.target.value)} rows={4} placeholder="document.querySelector('button')?.click()" style={{ ...inp, height:100, resize:'vertical', fontFamily:'monospace', fontSize:12 }} /></div>}
 
-              <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:18 }}>
+              <div className="modal-footer" style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:18 }}>
                 <button onClick={()=>setShowBatch(false)} style={{ padding:'10px 18px', background:'#111d2e', border:`1px solid ${st.border}`, borderRadius:8, color:st.t2, cursor:'pointer', fontSize:13 }}>Cancel</button>
                 <button onClick={runBatch} style={{ padding:'10px 18px', background:st.cyan, color:'#000', border:'none', borderRadius:8, fontWeight:800, cursor:'pointer', fontSize:13 }}>▶ Run on All</button>
               </div>
