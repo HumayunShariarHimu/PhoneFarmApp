@@ -1,6 +1,7 @@
 'use strict';
 
 const puppeteer = require('puppeteer');
+const chromium  = require('@sparticuz/chromium');
 
 const { v4: uuid } = require('uuid');
 const EventEmitter  = require('events');
@@ -53,8 +54,8 @@ class VirtualDevice extends EventEmitter {
 
     this.browser = await puppeteer.launch({
       headless: 'new',
-      executablePath: process.env.PUPPETEER_EXEC || undefined,
-      args,
+      executablePath: process.env.PUPPETEER_EXEC || await chromium.executablePath(),
+      args: [...chromium.args, ...args],
       defaultViewport: {
         width: this.width, height: this.height,
         deviceScaleFactor: this.width >= 393 ? 3 : 2.75,
