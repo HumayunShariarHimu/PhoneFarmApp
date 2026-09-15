@@ -138,7 +138,7 @@ socketHandler(io, pool);
 const PORT = parseInt(process.env.PORT) || 4000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n╔══════════════════════════════╗`);
-  console.log(`║  Virtual Phone Farm v3       ║`);
+  console.log(`║  PhoneFarmZone               ║`);
   console.log(`║  API Port: ${PORT}              ║`);
   console.log(`╚══════════════════════════════╝\n`);
 });

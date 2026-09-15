@@ -74,7 +74,7 @@ export default function Home() {
   if (!authenticated) return (
     <main style={{ minHeight:'100vh', display:'grid', placeItems:'center', background:`radial-gradient(circle at 20% 0%, #122640 0%, ${st.darker} 45%)`, color:st.t1, padding:20 }}>
       <form onSubmit={login} style={{ width:'100%', maxWidth:390, background:'rgba(11,17,32,.92)', border:`1px solid ${st.border}`, borderRadius:18, padding:32, boxShadow:'0 22px 70px rgba(0,0,0,.45)' }}>
-        <div style={{ color:st.cyan, fontSize:12, letterSpacing:3, fontWeight:800 }}>VPFARM / OWNER ACCESS</div>
+        <div style={{ color:st.cyan, fontSize:12, letterSpacing:3, fontWeight:800 }}>PHONEFARMZONE / OWNER ACCESS</div>
         <h1 style={{ margin:'12px 0 8px', fontSize:28 }}>Secure control room</h1>
         <p style={{ color:st.t2, fontSize:13, lineHeight:1.6, marginBottom:24 }}>Enter the owner password to open the virtual device dashboard. Unauthenticated visitors cannot reach the API or live socket.</p>
         <label style={{ display:'block', color:st.t2, fontSize:12, marginBottom:7 }}>Password</label>
@@ -154,7 +154,7 @@ export default function Home() {
 
   return (
     <>
-      <Head><title>Virtual Phone Farm</title><meta name="viewport" content="width=device-width,initial-scale=1" /></Head>
+      <Head><title>PhoneFarmZone</title><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" /></Head>
       <style jsx global>{`
         :global(html), :global(body) { margin:0; padding:0; background:#07090f; overflow-x:hidden; }
         :global(*), :global(*::before), :global(*::after) { box-sizing:border-box; }
@@ -204,7 +204,7 @@ export default function Home() {
         <header className="app-header" style={{ background:'rgba(7,9,15,.95)', borderBottom:`1px solid ${st.border}`, padding:'0 16px', height:54, display:'flex', alignItems:'center', gap:12, position:'sticky', top:0, zIndex:100, backdropFilter:'blur(12px)' }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
             <div style={{ width:30, height:30, background:'linear-gradient(135deg,#00e5ff,#0070ff)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:900, color:'#000' }}>⌬</div>
-            <div style={{ fontWeight:800, fontSize:'1rem', color:'#fff', lineHeight:1 }}>VirtualFarm<span style={{ color:st.cyan, fontSize:11, fontWeight:400, marginLeft:4 }}>v3</span></div>
+            <div style={{ fontWeight:800, fontSize:'1rem', color:'#fff', lineHeight:1 }}>PhoneFarmZone</div>
           </div>
 
           {/* Search */}
@@ -458,6 +458,12 @@ export default function Home() {
             </div>
           </div>
         )}
+        <footer className="app-footer" style={{ borderTop:`1px solid ${st.border}`, padding:'20px 16px 28px', marginTop:20, textAlign:'center', color:st.t3, fontSize:12, lineHeight:1.7 }}>
+          <a href="https://phonefarmzone.vercel.app/" target="_blank" rel="noreferrer" style={{ color:st.cyan, fontWeight:800, textDecoration:'none' }}>PhoneFarmZone</a>
+          <span style={{ margin:'0 8px', opacity:.5 }}>·</span>
+          <span>Developed By </span>
+          <a href="https://github.com/HumayunShariarHimu" target="_blank" rel="noreferrer" style={{ color:st.t1, fontWeight:700, textDecoration:'none' }}>Humayun Shariar Himu</a>
+        </footer>
       </div>
     </>
   );
