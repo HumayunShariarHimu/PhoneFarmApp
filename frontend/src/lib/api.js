@@ -3,7 +3,21 @@ import axios from 'axios';
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'https://vpfarm-backend.onrender.com';
 
 const api = axios.create({ baseURL: `${BASE}/api`, timeout: 30000 });
-api.interceptors.response.use(r => r.data, e => Promise.reject(e?.response?.data || e));
+api.interceptors.request.use(config => {
+  if (typeof window !== 'undefined') {
+    const token = window.localStorage.getItem('farm_token');
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+api.interceptors.response.use(r => r.data, e => {
+  if (e?.response?.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new Event('farm:logout'));
+  return Promise.reject(e?.response?.data || e);
+});
+
+export const authAPI = {
+  login: password => axios.post(`${BASE}/api/auth/login`, { password }).then(r => r.data),
+};
 
 export const devicesAPI = {
   list:       ()              => api.get('/devices'),

@@ -2,14 +2,19 @@ import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import DeviceCard  from '../components/Phone/DeviceCard';
 import PhoneScreen from '../components/Phone/PhoneScreen';
-import { getSocket, ctrl } from '../lib/socket';
-import { devicesAPI } from '../lib/api';
+import { getSocket, ctrl, disconnectSocket } from '../lib/socket';
+import { authAPI, devicesAPI } from '../lib/api';
 import { ALL_MODELS, BRAND_LIST, BRANDS } from '../data/phoneModels';
 
 const st = { dark:'#0b1120', darker:'#07090f', border:'#162035', cyan:'#00e5ff', green:'#00e676', red:'#ff1744', yellow:'#ffd600', t1:'#dde5f0', t2:'#6b7e99', t3:'#2e3d52' };
 const inp = { background:st.dark, border:`1px solid ${st.border}`, borderRadius:7, color:st.t1, fontSize:13, padding:'8px 12px', outline:'none', width:'100%' };
 
 export default function Home() {
+  const [authenticated, setAuthenticated] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
   const [devices,  setDevices]  = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [viewing,  setViewing]  = useState(null); // full-screen device
@@ -29,6 +34,16 @@ export default function Home() {
 
   // Load devices & subscribe to updates
   useEffect(() => {
+    const token = window.localStorage.getItem('farm_token');
+    setAuthenticated(Boolean(token));
+    setAuthReady(true);
+    const logout = () => { window.localStorage.removeItem('farm_token'); disconnectSocket(); setAuthenticated(false); };
+    window.addEventListener('farm:logout', logout);
+    return () => window.removeEventListener('farm:logout', logout);
+  }, []);
+
+  useEffect(() => {
+    if (!authenticated) return undefined;
     devicesAPI.list().then(r => { setDevices(r.data||[]); setStats(r.stats||{}); }).catch(() => {});
 
     const sock = getSocket();
@@ -41,7 +56,34 @@ export default function Home() {
     sock.on('device:error', onDeviceError);
 
     return () => { sock.off('farm:state'); sock.off('farm:devices'); sock.off('farm:stats'); sock.off('device:added'); sock.off('device:removed'); sock.off('device:error', onDeviceError); };
-  }, []);
+  }, [authenticated]);
+
+  const login = async (event) => {
+    event.preventDefault();
+    setLoggingIn(true); setAuthError('');
+    try {
+      const result = await authAPI.login(password);
+      window.localStorage.setItem('farm_token', result.token);
+      setAuthenticated(true); setPassword('');
+    } catch (error) {
+      setAuthError(error?.error || 'Login failed. Check the password.');
+    } finally { setLoggingIn(false); }
+  };
+
+  if (!authReady) return <div style={{ minHeight:'100vh', background:st.darker }} />;
+  if (!authenticated) return (
+    <main style={{ minHeight:'100vh', display:'grid', placeItems:'center', background:`radial-gradient(circle at 20% 0%, #122640 0%, ${st.darker} 45%)`, color:st.t1, padding:20 }}>
+      <form onSubmit={login} style={{ width:'100%', maxWidth:390, background:'rgba(11,17,32,.92)', border:`1px solid ${st.border}`, borderRadius:18, padding:32, boxShadow:'0 22px 70px rgba(0,0,0,.45)' }}>
+        <div style={{ color:st.cyan, fontSize:12, letterSpacing:3, fontWeight:800 }}>VPFARM / OWNER ACCESS</div>
+        <h1 style={{ margin:'12px 0 8px', fontSize:28 }}>Secure control room</h1>
+        <p style={{ color:st.t2, fontSize:13, lineHeight:1.6, marginBottom:24 }}>Enter the owner password to open the virtual device dashboard. Unauthenticated visitors cannot reach the API or live socket.</p>
+        <label style={{ display:'block', color:st.t2, fontSize:12, marginBottom:7 }}>Password</label>
+        <input autoFocus type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Owner password" style={{ ...inp, padding:'12px 14px', fontSize:15, marginBottom:12 }} />
+        {authError && <div role="alert" style={{ color:'#ff6b88', background:'rgba(255,23,68,.1)', border:'1px solid rgba(255,23,68,.25)', borderRadius:8, padding:'9px 10px', fontSize:12, marginBottom:12 }}>{authError}</div>}
+        <button disabled={loggingIn || !password} type="submit" style={{ width:'100%', padding:'12px 14px', border:0, borderRadius:9, background:st.cyan, color:'#001018', fontWeight:800, cursor:loggingIn?'wait':'pointer', opacity:(loggingIn || !password) ? .8 : 1 }}>{loggingIn ? 'Checking…' : 'Unlock dashboard'}</button>
+      </form>
+    </main>
+  );
 
   // Filtered devices
   const filtered = devices.filter(d => {

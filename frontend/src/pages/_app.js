@@ -1,10 +1,6 @@
-// _app.js
-import { useEffect } from 'react';
-import { getSocket } from '../lib/socket';
 import Head from 'next/head';
 
 export default function App({ Component, pageProps }) {
-  useEffect(() => { getSocket(); }, []);
   return (
     <>
       <Head>

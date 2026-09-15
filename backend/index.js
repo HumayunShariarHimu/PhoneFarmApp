@@ -6,6 +6,7 @@ const { Server }  = require('socket.io');
 const cors        = require('cors');
 const compression = require('compression');
 const path        = require('path');
+const { PASSWORD, issueToken, requireAuth } = require('./src/auth');
 
 const { DevicePool } = require('./src/DevicePool');
 const socketHandler  = require('./src/socket');
@@ -13,7 +14,7 @@ const socketHandler  = require('./src/socket');
 const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, {
-  cors:         { origin: '*', credentials: true },
+  cors:         { origin: process.env.FRONTEND_URL || '*', credentials: true },
   transports:   ['websocket', 'polling'],
   pingTimeout:  60000,
   maxHttpBufferSize: 5e6,
@@ -21,9 +22,32 @@ const io     = new Server(server, {
 
 global.io = io;
 
-app.use(cors({ origin: '*', credentials: true }));
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token || socket.handshake.headers['x-farm-token'];
+  const { isValidToken } = require('./src/auth');
+  if (!isValidToken(token)) return next(new Error('Authentication required'));
+  next();
+});
+
+app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
 app.use(compression());
 app.use(express.json({ limit: '20mb' }));
+
+const loginAttempts = new Map();
+app.post('/api/auth/login', (req, res) => {
+  const ip = req.ip || 'unknown';
+  const now = Date.now();
+  const attempts = (loginAttempts.get(ip) || []).filter(t => now - t < 10 * 60 * 1000);
+  if (attempts.length >= 10) return res.status(429).json({ success: false, error: 'Too many attempts. Try again later.' });
+  attempts.push(now); loginAttempts.set(ip, attempts);
+  if (String(req.body?.password || '') !== PASSWORD) return res.status(401).json({ success: false, error: 'Incorrect password' });
+  loginAttempts.delete(ip);
+  res.json({ success: true, token: issueToken(), expiresIn: 12 * 60 * 60 });
+});
+app.use('/api', (req, res, next) => {
+  if (req.path === '/auth/login') return next();
+  return requireAuth(req, res, next);
+});
 
 const pool = new DevicePool();
 

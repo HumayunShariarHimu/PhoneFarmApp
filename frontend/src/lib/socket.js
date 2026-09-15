@@ -6,12 +6,17 @@ let socket = null;
 
 export function getSocket() {
   if (!socket) {
-    socket = io(WS, { transports:['websocket','polling'], reconnection:true, reconnectionDelay:1000 });
+    const token = typeof window !== 'undefined' ? window.localStorage.getItem('farm_token') : null;
+    socket = io(WS, { auth: { token }, transports:['websocket','polling'], reconnection:true, reconnectionDelay:1000 });
     socket.on('connect',       () => console.log('[WS] connected'));
     socket.on('disconnect',    () => console.log('[WS] disconnected'));
     socket.on('connect_error', e  => console.warn('[WS] error:', e.message));
   }
   return socket;
+}
+
+export function disconnectSocket() {
+  if (socket) { socket.disconnect(); socket = null; }
 }
 
 // Typed actions for device control
