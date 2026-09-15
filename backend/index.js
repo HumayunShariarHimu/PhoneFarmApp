@@ -10,11 +10,14 @@ const { PASSWORD, issueToken, requireAuth } = require('./src/auth');
 
 const { DevicePool } = require('./src/DevicePool');
 const socketHandler  = require('./src/socket');
-
+const allowedOrigin = (origin, callback) => {
+  if (!origin || origin === process.env.FRONTEND_URL || /^https:\/\/[-a-z0-9]+\.vercel\.app$/i.test(origin) || /^http:\/\/localhost(:\d+)?$/i.test(origin)) return callback(null, true);
+  return callback(new Error('Origin not allowed'));
+};
 const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, {
-  cors:         { origin: process.env.FRONTEND_URL || '*', credentials: true },
+  cors:         { origin: allowedOrigin, credentials: true },
   transports:   ['websocket', 'polling'],
   pingTimeout:  60000,
   maxHttpBufferSize: 5e6,
@@ -29,7 +32,7 @@ io.use((socket, next) => {
   next();
 });
 
-app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
+app.use(cors({ origin: allowedOrigin, credentials: true }));
 app.use(compression());
 app.use(express.json({ limit: '20mb' }));
 

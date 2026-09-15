@@ -165,13 +165,16 @@ export default function Home() {
           .app-header { height:auto !important; min-height:54px; padding:10px 12px !important; flex-wrap:wrap; }
           .header-search { order:3; flex-basis:100%; max-width:none !important; }
           .header-actions { gap:4px !important; }
+          .header-actions > button { white-space:nowrap; }
           .header-actions > div:first-child { max-width:120px; overflow:hidden; }
           .header-actions > button { padding:7px 9px !important; min-height:36px; }
+          .dashboard-content { padding:10px 10px 24px !important; }
           .toolbar { align-items:stretch !important; }
           .toolbar > select { flex:1; min-width:calc(50% - 4px); }
           .toolbar-actions { width:100%; }
           .toolbar-actions > button { flex:1; min-width:0; min-height:36px; }
           .device-grid { grid-template-columns:repeat(2, minmax(0, 1fr)) !important; gap:8px !important; }
+          .device-card { min-width:0 !important; }
           .brand-picker { display:grid !important; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px !important; }
           .brand-picker > button { min-height:38px; }
           .device-card .device-select { width:28px !important; height:28px !important; top:3px !important; left:3px !important; }
@@ -186,6 +189,7 @@ export default function Home() {
           .modal-footer > button { width:100%; }
           .viewer-shell { overflow-x:hidden !important; overflow-y:auto !important; }
           .viewer-info { width:100% !important; min-width:0 !important; }
+          .viewer-header-actions { flex-wrap:wrap; justify-content:flex-end; }
         }
         @media (max-width: 420px) {
           .header-actions > div:first-child { display:none; }
@@ -223,10 +227,11 @@ export default function Home() {
             </div>
             <button onClick={() => setShowAdd(true)}     style={{ padding:'7px 14px', background:st.cyan, color:'#000', border:'none', borderRadius:8, fontWeight:800, cursor:'pointer', fontSize:12, flexShrink:0 }}>＋ Add</button>
             <button onClick={() => setShowBatch(true)}   style={{ padding:'7px 12px', background:st.dark, border:`1px solid ${st.border}`, borderRadius:8, color:st.t2, cursor:'pointer', fontSize:12 }}>Batch</button>
+            <button onClick={() => { window.localStorage.removeItem('farm_token'); disconnectSocket(); setAuthenticated(false); }} style={{ padding:'7px 10px', background:'transparent', border:`1px solid ${st.border}`, borderRadius:8, color:st.t3, cursor:'pointer', fontSize:12 }} aria-label="Lock dashboard">Lock</button>
           </div>
         </header>
 
-        <div style={{ padding:'14px 16px' }}>
+        <div className="dashboard-content" style={{ padding:'14px 16px' }}>
           {/* Filter + controls bar */}
           <div className="toolbar" style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', marginBottom:12 }}>
             <select value={fBrand} onChange={e=>setFBrand(e.target.value)} style={{ ...inp, width:'auto', height:32, fontSize:12, padding:'5px 24px 5px 10px' }}>
@@ -295,7 +300,7 @@ export default function Home() {
             onClick={e => { if(e.target===e.currentTarget) setViewing(null); }}>
             <div className="viewer-shell" style={{ background:st.dark, border:`1px solid ${st.cyan}30`, borderRadius:16, padding:20, maxHeight:'95vh', overflow:'auto', display:'flex', gap:20, flexWrap:'wrap', alignItems:'flex-start', maxWidth:'90vw' }}>
               {/* Device info header */}
-              <div style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', paddingBottom:14, borderBottom:`1px solid ${st.border}` }}>
+              <div className="viewer-header-actions" style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', paddingBottom:14, borderBottom:`1px solid ${st.border}` }}>
                 <div>
                   <div style={{ fontWeight:800, fontSize:'1.05rem', color:'#fff' }}>{viewing.brand} {viewing.model}</div>
                   <div style={{ fontSize:12, color:st.t2, marginTop:2 }}>Android {viewing.android} · {viewing.width}×{viewing.height} · {viewing.ram}</div>
