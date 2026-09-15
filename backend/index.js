@@ -7,6 +7,7 @@ const cors        = require('cors');
 const compression = require('compression');
 const path        = require('path');
 const { PASSWORD, issueToken, requireAuth } = require('./src/auth');
+const { router: connectorRouter } = require('./src/connectors');
 
 const { DevicePool } = require('./src/DevicePool');
 const socketHandler  = require('./src/socket');
@@ -49,8 +50,10 @@ app.post('/api/auth/login', (req, res) => {
 });
 app.use('/api', (req, res, next) => {
   if (req.path === '/auth/login') return next();
+  if (req.path === '/connectors/pair' || req.path === '/connectors/heartbeat' || req.path === '/connectors/revoke') return next();
   return requireAuth(req, res, next);
 });
+app.use('/api/connectors', connectorRouter({ requireAuth }));
 
 const pool = new DevicePool();
 

@@ -461,6 +461,8 @@ export default function Home() {
         <footer className="app-footer" style={{ borderTop:`1px solid ${st.border}`, padding:'20px 16px 28px', marginTop:20, textAlign:'center', color:st.t3, fontSize:12, lineHeight:1.7 }}>
           <a href="https://phonefarmzone.vercel.app/" target="_blank" rel="noreferrer" style={{ color:st.cyan, fontWeight:800, textDecoration:'none' }}>PhoneFarmZone</a>
           <span style={{ margin:'0 8px', opacity:.5 }}>·</span>
+          <a href="https://github.com/HumayunShariarHimu/PhoneFarmConnectorApp/releases" target="_blank" rel="noreferrer" style={{ color:st.cyan, fontWeight:700, textDecoration:'none' }}>Connector APK</a>
+          <span style={{ margin:'0 8px', opacity:.5 }}>·</span>
           <span>Developed By </span>
           <a href="https://github.com/HumayunShariarHimu" target="_blank" rel="noreferrer" style={{ color:st.t1, fontWeight:700, textDecoration:'none' }}>Humayun Shariar Himu</a>
         </footer>
