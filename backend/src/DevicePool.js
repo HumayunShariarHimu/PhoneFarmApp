@@ -250,7 +250,15 @@ class DevicePool extends EventEmitter {
     const dev = new VirtualDevice(opts);
     this.devices.set(dev.id, dev);
     if (this._activeCount() < MAX_ACTIVE) {
-      await dev.start().catch(e => { dev.status = 'error'; dev.error = e.message; });
+      // Do not hold the HTTP request open while Chromium cold-starts on Render.
+      // The device is returned immediately as `starting`; socket/state events
+      // update the dashboard when it becomes running or errors.
+      dev.start().catch(e => {
+        dev.status = 'error';
+        dev.error = e.message || 'Browser startup failed';
+        dev.emit('status', dev.status);
+        if (global.io) global.io.emit('device:error', { id: dev.id, error: dev.error });
+      });
     } else {
       dev.status = 'queued';
     }
