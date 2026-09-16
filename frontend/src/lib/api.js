@@ -2,7 +2,10 @@ import axios from 'axios';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'https://vpfarm-backend.onrender.com';
 
-const api = axios.create({ baseURL: `${BASE}/api`, timeout: 30000 });
+// Render free services can take 30–90 seconds to wake from sleep. Keep the
+// request alive long enough for the service to wake instead of showing a
+// misleading device-creation failure while Chromium is still booting.
+const api = axios.create({ baseURL: `${BASE}/api`, timeout: 120000 });
 api.interceptors.request.use(config => {
   if (typeof window !== 'undefined') {
     const token = window.localStorage.getItem('farm_token');

@@ -156,7 +156,10 @@ export default function Home() {
       setStats(refreshed.stats || {});
       setShowAdd(false);
     } catch (error) {
-      setNotice(error?.error || error?.message || 'Could not connect to the backend.');
+      const timedOut = error?.code === 'ECONNABORTED' || /timeout/i.test(error?.message || '');
+      setNotice(timedOut
+        ? 'The Render backend is waking up. Please retry after a minute; no device was lost.'
+        : (error?.error || error?.message || 'Could not connect to the backend.'));
     } finally {
       setSavingAdd(false);
     }
