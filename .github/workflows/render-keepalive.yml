@@ -1,4 +1,4 @@
-name: Keep Render backend warm
+name: Keep Render backend awake
 
 on:
   schedule:
@@ -6,14 +6,20 @@ on:
   workflow_dispatch:
 
 jobs:
-  ping:
+  ping-render:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Ping Render health endpoint
+      - name: Wake and verify Render health endpoint
+        env:
+          HEALTH_URL: https://vpfarm-backend.onrender.com/health
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --max-time 30 \
+          response="$(curl --fail --silent --show-error --location \
+            --connect-timeout 20 --max-time 90 \
             -H 'Cache-Control: no-cache' \
-            https://vpfarm-backend.onrender.com/health
-          echo
+            -H 'User-Agent: PhoneFarmZone-Render-KeepAlive/1.0' \
+            "$HEALTH_URL")"
+          echo "$response"
+          echo "$response" | grep -q '"ok":true'
+          echo "Render backend is healthy."
