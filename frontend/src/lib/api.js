@@ -36,6 +36,13 @@ export const devicesAPI = {
   stopAll:    ()              => api.post('/farm/stop-all'),
   removeAll:  ()              => api.post('/farm/remove-all'),
   stats:      ()              => api.get('/stats'),
+  diagnostics:(id)           => api.get(`/devices/${id}/diagnostics`),
+  logs:       (id)           => api.get(`/devices/${id}/logs`),
+  clearStorage:(id)          => api.post(`/devices/${id}/storage/clear`),
+  network:    (id, profile)   => api.post(`/devices/${id}/network`, { profile }),
+  geolocation:(id, data)     => api.post(`/devices/${id}/geolocation`, data),
+  clipboard: (id, action, text) => api.post(`/devices/${id}/clipboard`, { action, text }),
+  profiles:  ()              => api.get('/qa/profiles'),
 };
 
 export default api;

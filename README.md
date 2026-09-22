@@ -11,6 +11,7 @@ PhoneFarmZone is an owner-authenticated virtual device lab for mobile-web QA, re
 - Live screenshot streaming over Socket.IO, mobile viewport emulation, user-agent profiles and device metadata.
 - Authorized manual interactions: tap, double tap, long press, swipe, type, keyboard key, scroll, navigation, reload and screenshot.
 - Batch actions for selected devices, start/stop/remove-all controls, device groups and audit events.
+- QA lab controls: online/offline, Slow 3G, Fast 3G and 4G network profiles; Dhaka, Chittagong, London and New York geolocation presets; browser cache/cookie/local/session storage reset; clipboard read/write; request counters; page title and viewport inspection; console/page-error/request-failure logs; and live device diagnostics.
 - Owner password login with signed expiring tokens, rate-limited login attempts, protected REST and WebSocket APIs, CORS allow-listing and security headers.
 - Health endpoint for Render monitoring and a small audit API for recent device lifecycle/actions.
 
@@ -44,7 +45,7 @@ Set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` to `http://localhost:4000` wh
 
 The backend is configured by [`backend/render.yaml`](backend/render.yaml). In Render, confirm the service uses the repository root directory `backend`, build command `npm install --no-audit --no-fund`, start command `node index.js`, and health path `/health`. Set the secret environment values `FRONTEND_URL`, `FARM_PASSWORD`, and `FARM_SESSION_SECRET`; do not use the old default password in production. The free plan is suitable for a small QA pool only; Chromium sessions are memory-intensive, so increase `MAX_ACTIVE` only after observing memory and restart behavior on an appropriately sized plan.
 
-The health response contains `ok`, uptime, version and device counts. Render uses `/health` for automatic service health checks. In addition, `.github/workflows/render-keepalive.yml` sends an external health ping every five minutes with retries and overlap protection. This is the correct place for the keep-alive scheduler because an application cannot wake itself while its host process is asleep. Render may still apply free-plan sleep or scheduled-workflow delays, so this workflow is an availability aid and not a contractual substitute for a paid always-on plan.
+The health response contains `ok`, uptime, version, mode, memory usage and device counts. Render uses `/health` for automatic service health checks. In addition, `.github/workflows/render-keepalive.yml` sends an external health ping every five minutes with retries and overlap protection. This is the correct place for the keep-alive scheduler because an application cannot wake itself while its host process is asleep. Render may still apply free-plan sleep or scheduled-workflow delays, so this workflow is an availability aid and not a contractual substitute for a paid always-on plan.
 
 ## Vercel deployment
 
@@ -60,6 +61,6 @@ Then set the exact Vercel production URL as Render's comma-separated `FRONTEND_U
 
 ## Operational notes
 
-Render's free service may sleep and cold-start. Device browser sessions are intentionally in-memory and are stopped when the service restarts; the dashboard should be used to recreate the test pool. For durable test results, export them from the application or add a separately managed database rather than storing Chromium state on the ephemeral filesystem.
+Render's free service may sleep and cold-start. Device browser sessions are intentionally in-memory and are stopped when the service restarts; the dashboard should be used to recreate the test pool. The implemented feature set is a mobile-browser QA lab, not a native Android operating system or ADB farm. APK installation, Android system apps, emulator snapshots and physical USB devices require a separate Android worker. For durable test results, export them from the application or add a separately managed database rather than storing Chromium state on the ephemeral filesystem.
 
 The connector integration has been removed from both code and configuration. There are no pairing, heartbeat or connector routes in the backend.

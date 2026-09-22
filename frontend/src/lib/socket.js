@@ -42,6 +42,12 @@ export const ctrl = {
   goto:       (id, url)               => getSocket().emit('goto',       { id, url }),
   screenshot: (id)                    => getSocket().emit('screenshot', { id }),
   eval:       (id, code)              => getSocket().emit('eval',       { id, code }),
+  network:    (id, profile)           => getSocket().emit('network',    { id, profile }),
+  geolocation:(id, data)              => getSocket().emit('geolocation',{ id, ...data }),
+  clearStorage:(id)                   => getSocket().emit('clear_storage', { id }),
+  diagnostics:(id)                    => getSocket().emit('diagnostics', { id }),
+  clipboardGet:(id)                  => getSocket().emit('clipboard_get', { id }),
+  clipboardSet:(id, text)             => getSocket().emit('clipboard_set', { id, text }),
 
   addDevice:  (opts)                  => getSocket().emit('device:add',      opts),
   addMany:    (devices)               => getSocket().emit('device:add_many', { devices }),

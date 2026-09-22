@@ -31,6 +31,12 @@ export default function Home() {
   const [activeTab,setActiveTab]=useState('url');
   const [savingAdd, setSavingAdd] = useState(false);
   const [notice, setNotice] = useState('');
+  const [diagnostics, setDiagnostics] = useState(null);
+  const [deviceLogs, setDeviceLogs] = useState([]);
+  const [networkProfile, setNetworkProfile] = useState('online');
+  const [geoPreset, setGeoPreset] = useState('Dhaka');
+  const [clipboardText, setClipboardText] = useState('');
+  const [qaBusy, setQaBusy] = useState(false);
 
   // Load devices & subscribe to updates
   useEffect(() => {
@@ -109,6 +115,31 @@ export default function Home() {
     else if (action === 'stop')   ctrl.stopDevice(id);
     else if (action === 'remove') { ctrl.removeDevice(id); setSelected(s=>{const n=new Set(s);n.delete(id);return n;}); }
     else if (action === 'screenshot') ctrl.screenshot(id);
+  };
+
+  const refreshDiagnostics = async (id = viewing?.id) => {
+    if (!id) return;
+    try {
+      const [diag, logs] = await Promise.all([devicesAPI.diagnostics(id), devicesAPI.logs(id)]);
+      setDiagnostics(diag.data || null); setDeviceLogs(logs.data || []);
+    } catch (error) { setNotice(error?.error || error?.message || 'Diagnostics unavailable.'); }
+  };
+
+  const runQaAction = async (action) => {
+    if (!viewing?.id) return;
+    setQaBusy(true); setNotice('');
+    try {
+      if (action === 'network') await devicesAPI.network(viewing.id, networkProfile);
+      if (action === 'geo') {
+        const coords = { Dhaka:[23.8103,90.4125], Chittagong:[22.3569,91.7832], London:[51.5072,-0.1276], NewYork:[40.7128,-74.006] }[geoPreset];
+        await devicesAPI.geolocation(viewing.id, { latitude: coords[0], longitude: coords[1], accuracy: 30 });
+      }
+      if (action === 'clear') await devicesAPI.clearStorage(viewing.id);
+      if (action === 'clipboard-set') await devicesAPI.clipboard(viewing.id, 'set', clipboardText);
+      if (action === 'clipboard-get') { const result = await devicesAPI.clipboard(viewing.id, 'get'); setClipboardText(result.data || ''); }
+      await refreshDiagnostics(viewing.id);
+    } catch (error) { setNotice(error?.error || error?.message || 'QA action failed.'); }
+    finally { setQaBusy(false); }
   };
 
   // Add devices
@@ -364,6 +395,37 @@ export default function Home() {
                       }} style={{ padding:'5px 8px', background:'#111d2e', border:`1px solid ${st.border}`, borderRadius:5, color:st.t2, cursor:'pointer', fontSize:11 }}>{l}</button>
                     ))}
                   </div>
+                </div>
+
+                {/* Render-compatible browser QA tools */}
+                <div style={{ background:'#080d18', border:`1px solid ${st.cyan}25`, borderRadius:8, padding:12 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                    <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.7px', color:st.cyan }}>QA Lab Tools</div>
+                    <button disabled={qaBusy} onClick={() => refreshDiagnostics(viewing.id)} style={{ padding:'4px 7px', background:'#111d2e', border:`1px solid ${st.border}`, borderRadius:5, color:st.t2, cursor:'pointer', fontSize:10 }}>↻ Inspect</button>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                    <select value={networkProfile} onChange={e=>setNetworkProfile(e.target.value)} style={{ ...inp, padding:'6px 8px', fontSize:11 }}>
+                      {['online','slow3g','fast3g','4g','offline'].map(v=><option key={v} value={v}>{v === 'slow3g' ? 'Slow 3G' : v === 'fast3g' ? 'Fast 3G' : v.toUpperCase()}</option>)}
+                    </select>
+                    <button disabled={qaBusy} onClick={() => runQaAction('network')} style={{ padding:'6px 8px', background:'#111d2e', border:`1px solid ${st.border}`, borderRadius:5, color:st.t1, cursor:'pointer', fontSize:11 }}>Apply Network</button>
+                    <select value={geoPreset} onChange={e=>setGeoPreset(e.target.value)} style={{ ...inp, padding:'6px 8px', fontSize:11 }}>
+                      {['Dhaka','Chittagong','London','NewYork'].map(v=><option key={v} value={v}>{v === 'NewYork' ? 'New York' : v}</option>)}
+                    </select>
+                    <button disabled={qaBusy} onClick={() => runQaAction('geo')} style={{ padding:'6px 8px', background:'#111d2e', border:`1px solid ${st.border}`, borderRadius:5, color:st.t1, cursor:'pointer', fontSize:11 }}>Set Location</button>
+                    <button disabled={qaBusy} onClick={() => runQaAction('clear')} style={{ padding:'6px 8px', background:'rgba(255,23,68,.08)', border:'1px solid rgba(255,23,68,.2)', borderRadius:5, color:st.red, cursor:'pointer', fontSize:11 }}>Clear Storage</button>
+                    <button disabled={qaBusy} onClick={() => { ctrl.reload(viewing.id); refreshDiagnostics(viewing.id); }} style={{ padding:'6px 8px', background:'#111d2e', border:`1px solid ${st.border}`, borderRadius:5, color:st.t1, cursor:'pointer', fontSize:11 }}>Reload + Inspect</button>
+                  </div>
+                  <div style={{ display:'flex', gap:5, marginTop:7 }}>
+                    <input value={clipboardText} onChange={e=>setClipboardText(e.target.value)} placeholder="Clipboard text" style={{ ...inp, padding:'6px 8px', fontSize:11 }} />
+                    <button disabled={qaBusy} onClick={() => runQaAction('clipboard-set')} style={{ padding:'6px 8px', background:'#111d2e', border:`1px solid ${st.border}`, borderRadius:5, color:st.t2, cursor:'pointer', fontSize:11 }}>Set</button>
+                    <button disabled={qaBusy} onClick={() => runQaAction('clipboard-get')} style={{ padding:'6px 8px', background:'#111d2e', border:`1px solid ${st.border}`, borderRadius:5, color:st.t2, cursor:'pointer', fontSize:11 }}>Get</button>
+                  </div>
+                  {diagnostics && <div style={{ marginTop:9, display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, fontSize:10, color:st.t2 }}>
+                    <span>Requests: <b style={{ color:st.t1 }}>{diagnostics.requestCount}</b></span><span>Failed: <b style={{ color:diagnostics.failedRequestCount ? st.red : st.t1 }}>{diagnostics.failedRequestCount}</b></span>
+                    <span>Cookies: <b style={{ color:st.t1 }}>{diagnostics.cookies}</b></span><span>Network: <b style={{ color:st.cyan }}>{diagnostics.network}</b></span>
+                    <span style={{ gridColumn:'1/-1', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>Title: {diagnostics.title || '—'}</span>
+                  </div>}
+                  {deviceLogs.length > 0 && <div style={{ marginTop:8, maxHeight:92, overflow:'auto', borderTop:`1px solid ${st.border}`, paddingTop:6 }}>{deviceLogs.slice(0,8).map((log, i)=><div key={`${log.at}-${i}`} style={{ fontSize:9, color:log.level==='error'?st.red:st.t3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{new Date(log.at).toLocaleTimeString()} · {log.message}</div>)}</div>}
                 </div>
               </div>
             </div>
