@@ -37,6 +37,10 @@ export default function Home() {
   const [geoPreset, setGeoPreset] = useState('Dhaka');
   const [clipboardText, setClipboardText] = useState('');
   const [qaBusy, setQaBusy] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordingName, setRecordingName] = useState('Mobile smoke test');
+  const [recordingActions, setRecordingActions] = useState([]);
+  const [savedRecordings, setSavedRecordings] = useState([]);
 
   // Load devices & subscribe to updates
   useEffect(() => {
@@ -62,6 +66,11 @@ export default function Home() {
 
     return () => { sock.off('farm:state'); sock.off('farm:devices'); sock.off('farm:stats'); sock.off('device:added'); sock.off('device:removed'); sock.off('device:error', onDeviceError); };
   }, [authenticated]);
+
+  useEffect(() => {
+    if (!authenticated) return;
+    devicesAPI.recordings().then(result => setSavedRecordings(result.data || [])).catch(() => {});
+  }, [authenticated, viewing?.id]);
 
   const login = async (event) => {
     event.preventDefault();
@@ -141,6 +150,14 @@ export default function Home() {
     } catch (error) { setNotice(error?.error || error?.message || 'QA action failed.'); }
     finally { setQaBusy(false); }
   };
+
+  const recordAction = (action) => { if (recording) setRecordingActions(actions => [...actions, { ...action, at: new Date().toISOString() }].slice(-100)); };
+  const startRecording = () => { setRecordingActions([]); setRecording(true); setNotice('Recording touch and navigation actions.'); };
+  const stopRecording = async () => {
+    setRecording(false); if (!recordingActions.length) { setNotice('No actions recorded yet.'); return; }
+    try { const created = await devicesAPI.createRecording(recordingName); for (const action of recordingActions) await devicesAPI.addRecordingAction(created.data.id, action); const list = await devicesAPI.recordings(); setSavedRecordings(list.data || []); setNotice(`Saved ${recordingActions.length} actions as ${recordingName}.`); } catch (error) { setNotice(error?.error || error?.message || 'Could not save recording.'); }
+  };
+  const replayRecording = async (id) => { try { const result = await devicesAPI.replayRecording(id, selected.size ? [...selected] : [viewing?.id].filter(Boolean)); setNotice(`Replay finished: ${(result.data || []).filter(x => x.ok).length} device(s) passed.`); } catch (error) { setNotice(error?.error || error?.message || 'Replay failed.'); } };
 
   // Add devices
   const addDevices = async () => {
@@ -356,7 +373,7 @@ export default function Home() {
               </div>
 
               {/* Phone screen */}
-              <PhoneScreen device={viewing} width={280} showControls={true} />
+              <PhoneScreen device={viewing} width={280} showControls={true} onAction={recordAction} />
 
               {/* Extended controls */}
               <div className="viewer-info" style={{ flex:1, minWidth:240, display:'flex', flexDirection:'column', gap:12 }}>
@@ -426,6 +443,11 @@ export default function Home() {
                     <span style={{ gridColumn:'1/-1', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>Title: {diagnostics.title || '—'}</span>
                   </div>}
                   {deviceLogs.length > 0 && <div style={{ marginTop:8, maxHeight:92, overflow:'auto', borderTop:`1px solid ${st.border}`, paddingTop:6 }}>{deviceLogs.slice(0,8).map((log, i)=><div key={`${log.at}-${i}`} style={{ fontSize:9, color:log.level==='error'?st.red:st.t3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{new Date(log.at).toLocaleTimeString()} · {log.message}</div>)}</div>}
+                </div>
+                <div style={{ background:'#080d18', border:`1px solid ${recording ? st.red : st.border}`, borderRadius:8, padding:12 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}><div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.7px', color:recording?st.red:st.t3 }}>Test Recording {recording ? `· ${recordingActions.length}` : ''}</div><span style={{ fontSize:10, color:st.t3 }}>touch + pinch + swipe</span></div>
+                  {!recording ? <div style={{ display:'flex', gap:5 }}><input value={recordingName} onChange={e=>setRecordingName(e.target.value)} style={{ ...inp, padding:'6px 8px', fontSize:11 }} /><button onClick={startRecording} style={{ padding:'6px 8px', background:'rgba(255,23,68,.12)', border:`1px solid ${st.red}55`, borderRadius:5, color:st.red, cursor:'pointer', fontSize:11 }}>● Record</button></div> : <button onClick={stopRecording} style={{ width:'100%', padding:'7px 8px', background:st.red, border:'none', borderRadius:5, color:'#fff', cursor:'pointer', fontSize:11, fontWeight:700 }}>■ Stop & Save ({recordingActions.length})</button>}
+                  {savedRecordings.length > 0 && <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:4 }}>{savedRecordings.slice(-5).reverse().map(test => <div key={test.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:5, fontSize:10, color:st.t2 }}><span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{test.name} · {test.actions.length}</span><button onClick={()=>replayRecording(test.id)} style={{ padding:'4px 7px', background:'#111d2e', border:`1px solid ${st.border}`, borderRadius:4, color:st.cyan, cursor:'pointer', fontSize:10 }}>Replay</button></div>)}</div>}
                 </div>
               </div>
             </div>

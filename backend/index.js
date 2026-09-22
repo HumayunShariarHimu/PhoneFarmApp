@@ -39,13 +39,18 @@ app.post('/api/devices/:id/storage/clear', wrap(async (req, res) => res.json({ s
 app.post('/api/devices/:id/network', wrap(async (req, res) => res.json({ success: true, data: await pool.action(req.params.id, 'network', req.body) })));
 app.post('/api/devices/:id/geolocation', wrap(async (req, res) => res.json({ success: true, data: await pool.action(req.params.id, 'geolocation', req.body) })));
 app.post('/api/devices/:id/clipboard', wrap(async (req, res) => { const action = req.body.action === 'get' ? 'clipboard_get' : 'clipboard_set'; return res.json({ success: true, data: await pool.action(req.params.id, action, req.body) }); }));
+app.post('/api/recordings', wrap(async (req, res) => res.json({ success: true, data: pool.createRecording(req.body?.name) })));
+app.get('/api/recordings', (req, res) => res.json({ success: true, data: pool.listRecordings() }));
+app.post('/api/recordings/:id/actions', wrap(async (req, res) => res.json({ success: true, data: pool.addRecordingAction(req.params.id, req.body) })));
+app.post('/api/recordings/:id/replay', wrap(async (req, res) => res.json({ success: true, data: await pool.replayRecording(req.params.id, req.body?.ids) })));
+app.delete('/api/recordings/:id', (req, res) => res.json({ success: pool.deleteRecording(req.params.id) }));
 app.post('/api/batch', wrap(async (req, res) => { const { ids = [], action, params } = req.body || {}; if (!Array.isArray(ids) || ids.length > 50) throw new Error('Select up to 50 devices.'); res.json({ success: true, results: (await pool.batch(ids, action, params || {})).map((r, i) => ({ id: ids[i], ok: r.status === 'fulfilled', value: r.value, error: r.reason?.message })) }); }));
 app.post('/api/farm/start-all', wrap(async (req, res) => { await pool.startAll(); res.json({ success: true }); }));
 app.post('/api/farm/stop-all', wrap(async (req, res) => { await pool.stopAll(); res.json({ success: true }); }));
 app.post('/api/farm/remove-all', wrap(async (req, res) => { await pool.removeAll(); res.json({ success: true }); }));
 app.get('/api/stats', (req, res) => res.json({ success: true, data: pool.getStats() }));
 app.get('/api/audit', (req, res) => res.json({ success: true, data: pool.getAudit() }));
-app.get('/api/config', (req, res) => res.json({ success: true, data: { maxActive: pool.maxActive, screenshotInterval: pool.screenshotInterval, browserEvalEnabled: process.env.ENABLE_BROWSER_EVAL === 'true', mode: 'authorized-device-lab', capabilities: ['touch', 'swipe', 'screenshots', 'console-logs', 'network-profiles', 'geolocation', 'storage-reset', 'clipboard', 'diagnostics'] } }));
+app.get('/api/config', (req, res) => res.json({ success: true, data: { maxActive: pool.maxActive, screenshotInterval: pool.screenshotInterval, browserEvalEnabled: process.env.ENABLE_BROWSER_EVAL === 'true', mode: 'authorized-device-lab', capabilities: ['touch', 'multi-touch-pinch', 'swipe', 'screenshots', 'console-logs', 'network-profiles', 'custom-network', 'geolocation', 'storage-reset', 'clipboard', 'diagnostics', 'record-and-replay'] } }));
 app.get('/api/qa/profiles', (req, res) => res.json({ success: true, data: { network: Object.keys(NETWORK_PROFILES), geolocation: { Dhaka: { latitude: 23.8103, longitude: 90.4125, accuracy: 30 }, Chittagong: { latitude: 22.3569, longitude: 91.7832, accuracy: 30 }, London: { latitude: 51.5072, longitude: -0.1276, accuracy: 30 }, NewYork: { latitude: 40.7128, longitude: -74.006, accuracy: 30 } } } }));
 app.get('/health', (req, res) => res.json({ ok: true, uptime: Math.floor(process.uptime()), devices: pool.getStats(), version: '2.1.0', mode: 'authorized-device-lab' }));
 const PUBLIC = path.join(__dirname, 'public'); if (fs.existsSync(PUBLIC)) { app.use(express.static(PUBLIC)); app.get('*', (req, res) => res.sendFile(path.join(PUBLIC, 'index.html'))); }

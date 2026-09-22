@@ -10,6 +10,7 @@ PhoneFarmZone is an owner-authenticated virtual device lab for mobile-web QA, re
 - Add up to 20 virtual device profiles at a time, with queueing when the Render memory budget is reached.
 - Live screenshot streaming over Socket.IO, mobile viewport emulation, user-agent profiles and device metadata.
 - Authorized manual interactions: tap, double tap, long press, swipe, type, keyboard key, scroll, navigation, reload and screenshot.
+- Multi-touch pinch gestures plus touch-action recording and replayable browser QA tests across one or more selected devices.
 - Batch actions for selected devices, start/stop/remove-all controls, device groups and audit events.
 - QA lab controls: online/offline, Slow 3G, Fast 3G and 4G network profiles; Dhaka, Chittagong, London and New York geolocation presets; browser cache/cookie/local/session storage reset; clipboard read/write; request counters; page title and viewport inspection; console/page-error/request-failure logs; and live device diagnostics.
 - Owner password login with signed expiring tokens, rate-limited login attempts, protected REST and WebSocket APIs, CORS allow-listing and security headers.

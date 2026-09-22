@@ -6,11 +6,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getSocket, ctrl } from '../../lib/socket';
 
-export default function PhoneScreen({ device, width = 280, showControls = true, className = '' }) {
+export default function PhoneScreen({ device, width = 280, showControls = true, className = '', onAction }) {
   const imgRef      = useRef(null);
   const containerRef = useRef(null);
   const touchRef    = useRef(null);
   const lastTapRef  = useRef(null);
+  const pointersRef = useRef(new Map());
+  const pinchRef    = useRef(null);
 
   const [frame,    setFrame]    = useState(null);
   const [live,     setLive]     = useState(false);
@@ -60,8 +62,8 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
     e.preventDefault();
     if (device?.status !== 'running') return;
     const { x, y } = toDeviceCoords(e.clientX, e.clientY);
-    ctrl.longPress(device.id, x, y, 1000);
-  }, [device?.id, device?.status, toDeviceCoords]);
+    ctrl.longPress(device.id, x, y, 1000); onAction?.({ action:'long_press', x, y, ms:1000 });
+  }, [device?.id, device?.status, toDeviceCoords, onAction]);
 
   // Pointer events unify mouse, touch and stylus. This prevents mobile browsers
   // from scrolling/zooming the dashboard instead of forwarding the gesture.
@@ -69,6 +71,15 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
     if (device?.status !== 'running' || e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     containerRef.current?.setPointerCapture?.(e.pointerId);
+    pointersRef.current.set(e.pointerId, { clientX:e.clientX, clientY:e.clientY });
+    if (pointersRef.current.size === 2) {
+      clearTimeout(touchRef.current?.longTimer);
+      const points = [...pointersRef.current.values()];
+      const distance = Math.hypot(points[1].clientX - points[0].clientX, points[1].clientY - points[0].clientY);
+      const center = { clientX:(points[0].clientX + points[1].clientX) / 2, clientY:(points[0].clientY + points[1].clientY) / 2 };
+      pinchRef.current = { startDistance:distance, center:toDeviceCoords(center.clientX, center.clientY) };
+      touchRef.current = null; return;
+    }
     const p = toDeviceCoords(e.clientX, e.clientY);
     const started = { clientX: e.clientX, clientY: e.clientY, x: p.x, y: p.y, time: Date.now(), moved: false, longPressed: false, pointerId: e.pointerId };
     touchRef.current = started;
@@ -76,11 +87,14 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
       if (touchRef.current === started && !started.moved) {
         started.longPressed = true;
         ctrl.longPress(device.id, started.x, started.y, 700);
+        onAction?.({ action:'long_press', x:started.x, y:started.y, ms:700 });
       }
     }, 650);
-  }, [device?.id, device?.status, toDeviceCoords]);
+  }, [device?.id, device?.status, toDeviceCoords, onAction]);
 
   const onPointerMove = useCallback((e) => {
+    if (pointersRef.current.has(e.pointerId)) pointersRef.current.set(e.pointerId, { clientX:e.clientX, clientY:e.clientY });
+    if (pinchRef.current && pointersRef.current.size >= 2) return;
     const start = touchRef.current;
     if (!start || start.pointerId !== e.pointerId) return;
     const dx = e.clientX - start.clientX;
@@ -89,6 +103,21 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
   }, []);
 
   const onPointerUp = useCallback((e) => {
+    if (pointersRef.current.has(e.pointerId)) pointersRef.current.set(e.pointerId, { clientX:e.clientX, clientY:e.clientY });
+    if (pinchRef.current) {
+      const points = [...pointersRef.current.values()];
+      if (points.length >= 2) {
+        const endDistance = Math.hypot(points[1].clientX - points[0].clientX, points[1].clientY - points[0].clientY);
+        const rect = containerRef.current?.getBoundingClientRect();
+        const scale = dw / (rect?.width || dw);
+        const pinch = pinchRef.current;
+        const startDistance = Math.round(pinch.startDistance * scale); const finalDistance = Math.round(endDistance * scale);
+        ctrl.pinch(device.id, pinch.center.x, pinch.center.y, startDistance, finalDistance);
+        onAction?.({ action:'pinch', x:pinch.center.x, y:pinch.center.y, startDistance, endDistance:finalDistance });
+      }
+      pointersRef.current.delete(e.pointerId); pinchRef.current = null; touchRef.current = null; return;
+    }
+    pointersRef.current.delete(e.pointerId);
     const start = touchRef.current;
     if (!start || start.pointerId !== e.pointerId || device?.status !== 'running') return;
     clearTimeout(start.longTimer);
@@ -103,23 +132,24 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
         if (previous && Date.now() - previous.time < 320 && Math.abs(previous.x - end.x) < 24 && Math.abs(previous.y - end.y) < 24) {
           clearTimeout(previous.timer);
           lastTapRef.current = null;
-          ctrl.doubleTap(device.id, end.x, end.y);
+          ctrl.doubleTap(device.id, end.x, end.y); onAction?.({ action:'double_tap', x:end.x, y:end.y });
         } else {
-          const timer = setTimeout(() => { ctrl.tap(device.id, end.x, end.y); lastTapRef.current = null; }, 180);
+          const timer = setTimeout(() => { ctrl.tap(device.id, end.x, end.y); onAction?.({ action:'tap', x:end.x, y:end.y }); lastTapRef.current = null; }, 180);
           lastTapRef.current = { x: end.x, y: end.y, time: Date.now(), timer };
         }
       } else {
-        ctrl.swipe(device.id, start.x, start.y, end.x, end.y, Math.min(duration, 1200));
+        ctrl.swipe(device.id, start.x, start.y, end.x, end.y, Math.min(duration, 1200)); onAction?.({ action:'swipe', x1:start.x, y1:start.y, x2:end.x, y2:end.y, ms:Math.min(duration, 1200) });
       }
     }
     touchRef.current = null;
-  }, [device?.id, device?.status, toDeviceCoords]);
+  }, [device?.id, device?.status, toDeviceCoords, dw, onAction]);
 
   const onPointerCancel = useCallback((e) => {
     if (touchRef.current?.pointerId === e.pointerId) {
       clearTimeout(touchRef.current.longTimer);
       touchRef.current = null;
     }
+    pointersRef.current.delete(e.pointerId); pinchRef.current = null;
   }, []);
 
   // Keyboard forwarding

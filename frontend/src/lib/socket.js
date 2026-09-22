@@ -25,6 +25,7 @@ export const ctrl = {
   doubleTap:  (id, x, y)              => getSocket().emit('double_tap', { id, x, y }),
   longPress:  (id, x, y, ms)          => getSocket().emit('long_press', { id, x, y, ms }),
   swipe:      (id, x1,y1,x2,y2,ms)   => getSocket().emit('swipe',      { id, x1, y1, x2, y2, ms }),
+  pinch:      (id, x, y, startDistance, endDistance, ms) => getSocket().emit('pinch', { id, x, y, startDistance, endDistance, ms }),
   swipeUp:    (id)                    => getSocket().emit('swipe_up',   { id }),
   swipeDown:  (id)                    => getSocket().emit('swipe_down', { id }),
   swipeLeft:  (id)                    => getSocket().emit('swipe_left', { id }),

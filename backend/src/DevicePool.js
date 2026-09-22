@@ -101,6 +101,17 @@ class VirtualDevice extends EventEmitter {
     for (let i = 1; i <= steps; i += 1) { await this.cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x1 + (x2 - x1) * i / steps, y: y1 + (y2 - y1) * i / steps, radiusX: 1, radiusY: 1 }] }); await this._sleep(duration / steps); }
     await this.cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   }
+  async pinch(x, y, startDistance = 80, endDistance = 180, ms = 450) {
+    if (!this.cdp) return;
+    const duration = Math.min(Math.max(Number(ms) || 450, 80), 3000);
+    const steps = Math.max(6, Math.floor(duration / 16));
+    const start = Math.max(10, Number(startDistance) || 80);
+    const end = Math.max(10, Number(endDistance) || 180);
+    const points = distance => [{ x: Number(x) - distance / 2, y: Number(y), radiusX: 1, radiusY: 1 }, { x: Number(x) + distance / 2, y: Number(y), radiusX: 1, radiusY: 1 }];
+    await this.cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points(start) });
+    for (let i = 1; i <= steps; i += 1) { const distance = start + (end - start) * i / steps; await this.cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: points(distance) }); await this._sleep(duration / steps); }
+    await this.cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
   swipeUp() { return this.swipe(this.width / 2, this.height * .75, this.width / 2, this.height * .25); }
   swipeDown() { return this.swipe(this.width / 2, this.height * .25, this.width / 2, this.height * .75); }
   swipeLeft() { return this.swipe(this.width * .85, this.height / 2, this.width * .15, this.height / 2); }
@@ -118,6 +129,12 @@ class VirtualDevice extends EventEmitter {
     this.network = profile;
     if (this.cdp) await this.cdp.send('Network.emulateNetworkConditions', NETWORK_PROFILES[profile]);
     this.log('info', 'network.profile', { profile }); return profile;
+  }
+  async setCustomNetwork({ latency = 0, downloadThroughput = -1, uploadThroughput = -1, offline = false } = {}) {
+    const conditions = { offline: Boolean(offline), latency: Math.max(0, Math.min(Number(latency) || 0, 3000)), downloadThroughput: Math.max(-1, Number(downloadThroughput) || -1), uploadThroughput: Math.max(-1, Number(uploadThroughput) || -1) };
+    if (this.cdp) await this.cdp.send('Network.emulateNetworkConditions', conditions);
+    this.network = `custom:${conditions.latency}ms/${conditions.downloadThroughput}bps`;
+    this.log('info', 'network.custom', conditions); return conditions;
   }
   async setGeolocation(latitude, longitude, accuracy = 50) {
     const lat = Number(latitude), lon = Number(longitude), acc = Number(accuracy) || 50;
@@ -151,9 +168,14 @@ class VirtualDevice extends EventEmitter {
 }
 
 class DevicePool extends EventEmitter {
-  constructor() { super(); this.devices = new Map(); this.audit = []; this.maxActive = MAX_ACTIVE; this.screenshotInterval = SCREENSHOT_INTERVAL; }
+  constructor() { super(); this.devices = new Map(); this.audit = []; this.recordings = new Map(); this.maxActive = MAX_ACTIVE; this.screenshotInterval = SCREENSHOT_INTERVAL; }
   record(event, detail = {}) { this.audit.unshift({ at: new Date().toISOString(), event, ...detail }); this.audit = this.audit.slice(0, 300); }
   getAudit() { return this.audit; }
+  createRecording(name = 'Untitled test') { const id = uuid(); const test = { id, name: String(name).slice(0, 120) || 'Untitled test', createdAt: new Date().toISOString(), actions: [] }; this.recordings.set(id, test); return test; }
+  listRecordings() { return [...this.recordings.values()].map(test => ({ ...test, actions: test.actions.map(action => ({ ...action })) })); }
+  addRecordingAction(id, action) { const test = this.recordings.get(id); if (!test) throw new Error('Recording not found'); if (!action?.action) throw new Error('Action is required'); test.actions.push({ ...action, at: new Date().toISOString() }); return test; }
+  async replayRecording(recordingId, ids = []) { const test = this.recordings.get(recordingId); if (!test) throw new Error('Recording not found'); const targets = (Array.isArray(ids) && ids.length ? ids : this.getAll().map(d => d.id)).slice(0, 50); const results = []; for (const id of targets) { const deviceResults = []; for (const step of test.actions) { try { deviceResults.push({ action: step.action, ok: true, value: await this.action(id, step.action, step) }); } catch (error) { deviceResults.push({ action: step.action, ok: false, error: error.message }); } } results.push({ id, ok: deviceResults.every(step => step.ok), steps: deviceResults }); } this.record('recording.replayed', { recordingId, ids: targets }); return results; }
+  deleteRecording(id) { return this.recordings.delete(id); }
   async add(o = {}) { const d = new VirtualDevice(o); this.devices.set(d.id, d); this.record('device.created', { id: d.id, name: d.name }); if (this._activeCount() < MAX_ACTIVE) d.start().catch(e => { this.record('device.error', { id: d.id, error: e.message }); if (global.io) global.io.emit('device:error', { id: d.id, error: e.message }); }); else d.status = 'queued'; if (global.io) global.io.emit('device:added', d.toJSON()); return d; }
   async addMany(list) { const out = []; for (const o of list.slice(0, 20)) { out.push(await this.add(o)); await new Promise(r => setTimeout(r, 250)); } return out; }
   async remove(id) { const d = this.devices.get(id); if (!d) return; await d.stop(); this.devices.delete(id); this.record('device.removed', { id }); this._startNext(); }
@@ -167,7 +189,7 @@ class DevicePool extends EventEmitter {
     const needsBrowser = !['screenshot'].includes(action);
     if (needsBrowser && (d.status === 'stopped' || d.status === 'queued')) await this.startDevice(id);
     this.record('device.action', { id, action });
-    const m = { tap: () => d.tap(p.x, p.y), double_tap: () => d.doubleTap(p.x, p.y), long_press: () => d.longPress(p.x, p.y, p.ms), swipe: () => d.swipe(p.x1, p.y1, p.x2, p.y2, p.ms), swipe_up: () => d.swipeUp(), swipe_down: () => d.swipeDown(), swipe_left: () => d.swipeLeft(), swipe_right: () => d.swipeRight(), type: () => d.type(p.text), key: () => d.pressKey(p.key), clear: () => d.clearInput(), scroll_down: () => d.scrollDown(p.px), scroll_up: () => d.scrollUp(p.px), scroll_top: () => d.scrollToTop(), scroll_bottom: () => d.scrollToBottom(), back: () => d.back(), forward: () => d.forward(), reload: () => d.reload(), goto: () => d.goto(p.url), screenshot: () => d.screenshot(), eval: () => d.eval(p.code), get_html: () => d.page?.content(), get_title: () => d.page?.title(), get_url: () => d.page?.url(), network: () => d.setNetwork(p.profile), geolocation: () => d.setGeolocation(p.latitude, p.longitude, p.accuracy), clear_storage: () => d.clearStorage(), diagnostics: () => d.getDiagnostics(), clipboard_get: () => d.getClipboard(), clipboard_set: () => d.setClipboard(p.text) };
+    const m = { tap: () => d.tap(p.x, p.y), double_tap: () => d.doubleTap(p.x, p.y), long_press: () => d.longPress(p.x, p.y, p.ms), swipe: () => d.swipe(p.x1, p.y1, p.x2, p.y2, p.ms), pinch: () => d.pinch(p.x, p.y, p.startDistance, p.endDistance, p.ms), swipe_up: () => d.swipeUp(), swipe_down: () => d.swipeDown(), swipe_left: () => d.swipeLeft(), swipe_right: () => d.swipeRight(), type: () => d.type(p.text), key: () => d.pressKey(p.key), clear: () => d.clearInput(), scroll_down: () => d.scrollDown(p.px), scroll_up: () => d.scrollUp(p.px), scroll_top: () => d.scrollToTop(), scroll_bottom: () => d.scrollToBottom(), back: () => d.back(), forward: () => d.forward(), reload: () => d.reload(), goto: () => d.goto(p.url), screenshot: () => d.screenshot(), eval: () => d.eval(p.code), get_html: () => d.page?.content(), get_title: () => d.page?.title(), get_url: () => d.page?.url(), network: () => p.profile === 'custom' ? d.setCustomNetwork(p) : d.setNetwork(p.profile), geolocation: () => d.setGeolocation(p.latitude, p.longitude, p.accuracy), clear_storage: () => d.clearStorage(), diagnostics: () => d.getDiagnostics(), clipboard_get: () => d.getClipboard(), clipboard_set: () => d.setClipboard(p.text) };
     if (!m[action]) throw new Error(`Unknown action: ${action}`); return m[action]();
   }
   batch(ids, action, params = {}) { return Promise.allSettled(ids.slice(0, 50).map(id => this.action(id, action, params))); }

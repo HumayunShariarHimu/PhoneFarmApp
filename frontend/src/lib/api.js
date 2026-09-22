@@ -43,6 +43,11 @@ export const devicesAPI = {
   geolocation:(id, data)     => api.post(`/devices/${id}/geolocation`, data),
   clipboard: (id, action, text) => api.post(`/devices/${id}/clipboard`, { action, text }),
   profiles:  ()              => api.get('/qa/profiles'),
+  recordings:()              => api.get('/recordings'),
+  createRecording: name     => api.post('/recordings', { name }),
+  addRecordingAction:(id, action) => api.post(`/recordings/${id}/actions`, action),
+  replayRecording:(id, ids) => api.post(`/recordings/${id}/replay`, { ids }),
+  deleteRecording:(id)      => api.delete(`/recordings/${id}`),
 };
 
 export default api;
