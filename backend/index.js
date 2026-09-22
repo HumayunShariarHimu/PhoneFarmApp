@@ -1,152 +1,38 @@
 'use strict';
 require('dotenv').config();
-const express     = require('express');
-const http        = require('http');
-const { Server }  = require('socket.io');
-const cors        = require('cors');
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const cors = require('cors');
 const compression = require('compression');
-const path        = require('path');
-const { PASSWORD, issueToken, requireAuth } = require('./src/auth');
-const { router: connectorRouter } = require('./src/connectors');
-
-const { DevicePool } = require('./src/DevicePool');
-const socketHandler  = require('./src/socket');
-const allowedOrigin = (origin, callback) => {
-  if (!origin || origin === process.env.FRONTEND_URL || /^https:\/\/[-a-z0-9]+\.vercel\.app$/i.test(origin) || /^http:\/\/localhost(:\d+)?$/i.test(origin)) return callback(null, true);
-  return callback(new Error('Origin not allowed'));
-};
-const app    = express();
-const server = http.createServer(app);
-const io     = new Server(server, {
-  cors:         { origin: allowedOrigin, credentials: true },
-  transports:   ['websocket', 'polling'],
-  pingTimeout:  60000,
-  maxHttpBufferSize: 5e6,
-});
-
-global.io = io;
-
-io.use((socket, next) => {
-  const token = socket.handshake.auth?.token || socket.handshake.headers['x-farm-token'];
-  const { isValidToken } = require('./src/auth');
-  if (!isValidToken(token)) return next(new Error('Authentication required'));
-  next();
-});
-
-app.use(cors({ origin: allowedOrigin, credentials: true }));
-app.use(compression());
-app.use(express.json({ limit: '20mb' }));
-
-const loginAttempts = new Map();
-app.post('/api/auth/login', (req, res) => {
-  const ip = req.ip || 'unknown';
-  const now = Date.now();
-  const attempts = (loginAttempts.get(ip) || []).filter(t => now - t < 10 * 60 * 1000);
-  if (attempts.length >= 10) return res.status(429).json({ success: false, error: 'Too many attempts. Try again later.' });
-  attempts.push(now); loginAttempts.set(ip, attempts);
-  if (String(req.body?.password || '') !== PASSWORD) return res.status(401).json({ success: false, error: 'Incorrect password' });
-  loginAttempts.delete(ip);
-  res.json({ success: true, token: issueToken(), expiresIn: 12 * 60 * 60 });
-});
-app.use('/api', (req, res, next) => {
-  if (req.path === '/auth/login') return next();
-  if (req.path === '/connectors/pair' || req.path === '/connectors/heartbeat' || req.path === '/connectors/revoke') return next();
-  return requireAuth(req, res, next);
-});
-app.use('/api/connectors', connectorRouter({ requireAuth }));
-
-const pool = new DevicePool();
-
-// ── REST API ──────────────────────────────
-app.get('/api/devices', (req, res) => {
-  res.json({ success: true, data: pool.getAllJSON(), stats: pool.getStats() });
-});
-
-app.post('/api/devices', async (req, res) => {
-  try {
-    const { count = 1, devices, ...opts } = req.body;
-    if (devices && Array.isArray(devices)) {
-      const created = await pool.addMany(devices);
-      return res.json({ success: true, data: created.map(d => d.toJSON()) });
-    }
-    const list = Array.from({ length: Math.min(count, 20) }, (_, i) => ({
-      ...opts,
-      name: count > 1 ? `${opts.name || opts.brand || 'Device'} ${String(pool.devices.size + i + 1).padStart(3,'0')}` : opts.name,
-    }));
-    const created = await pool.addMany(list);
-    res.json({ success: true, data: created.map(d => d.toJSON()) });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
-});
-
-app.get('/api/devices/:id', (req, res) => {
-  const dev = pool.get(req.params.id);
-  if (!dev) return res.status(404).json({ success: false, error: 'Not found' });
-  res.json({ success: true, data: dev.toJSON() });
-});
-
-app.delete('/api/devices/:id', async (req, res) => {
-  await pool.remove(req.params.id).catch(() => {});
-  res.json({ success: true });
-});
-
-app.post('/api/devices/:id/action', async (req, res) => {
-  try {
-    const result = await pool.action(req.params.id, req.body.action, req.body);
-    res.json({ success: true, data: result });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
-});
-
-app.post('/api/devices/:id/goto', async (req, res) => {
-  try {
-    const url = await pool.action(req.params.id, 'goto', req.body);
-    res.json({ success: true, data: { url } });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
-});
-
-app.get('/api/devices/:id/screenshot', async (req, res) => {
-  try {
-    const frame = await pool.action(req.params.id, 'screenshot');
-    res.json({ success: true, data: { frame } });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
-});
-
-app.post('/api/batch', async (req, res) => {
-  try {
-    const { ids, action, params } = req.body;
-    const results = await pool.batch(ids, action, params || {});
-    res.json({
-      success: true,
-      results: results.map((r, i) => ({ id: ids[i], ok: r.status === 'fulfilled', value: r.value })),
-    });
-  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
-});
-
-app.post('/api/farm/start-all',  async (req, res) => { await pool.startAll();  res.json({ success: true }); });
-app.post('/api/farm/stop-all',   async (req, res) => { await pool.stopAll();   res.json({ success: true }); });
-app.post('/api/farm/remove-all', async (req, res) => { await pool.removeAll(); res.json({ success: true }); });
-
-app.get('/api/stats', (req, res) => res.json({ success: true, data: pool.getStats() }));
-app.get('/health',    (req, res) => res.json({ ok: true, uptime: Math.floor(process.uptime()), devices: pool.getStats() }));
-
-// ── FRONTEND (static) ─────────────────────
-const PUBLIC = path.join(__dirname, 'public');
+const path = require('path');
 const fs = require('fs');
-if (fs.existsSync(PUBLIC)) {
-  app.use(express.static(PUBLIC));
-  app.get('*', (req, res) => res.sendFile(path.join(PUBLIC, 'index.html')));
-}
-
-socketHandler(io, pool);
-
-const PORT = parseInt(process.env.PORT) || 4000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n╔══════════════════════════════╗`);
-  console.log(`║  PhoneFarmZone               ║`);
-  console.log(`║  API Port: ${PORT}              ║`);
-  console.log(`╚══════════════════════════════╝\n`);
-});
-
-process.on('SIGTERM', async () => {
-  await pool.stopAll();
-  server.close(() => process.exit(0));
-});
+const { PASSWORD, issueToken, requireAuth, isValidToken } = require('./src/auth');
+const { DevicePool } = require('./src/DevicePool');
+const socketHandler = require('./src/socket');
+const configuredOrigins = String(process.env.FRONTEND_URL || '').split(',').map(v => v.trim()).filter(Boolean);
+const allowedOrigin = (origin, callback) => { if (!origin || configuredOrigins.includes(origin) || /^https:\/\/[-a-z0-9]+\.vercel\.app$/i.test(origin) || /^http:\/\/localhost(:\d+)?$/i.test(origin)) return callback(null, true); return callback(new Error('Origin not allowed')); };
+const app = express(); const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: allowedOrigin, credentials: true }, transports: ['websocket', 'polling'], pingTimeout: 60000, maxHttpBufferSize: 2e6 });
+global.io = io;
+io.use((socket, next) => { const token = socket.handshake.auth?.token || socket.handshake.headers['x-farm-token']; if (!isValidToken(token)) return next(new Error('Authentication required')); next(); });
+app.set('trust proxy', 1); app.use(cors({ origin: allowedOrigin, credentials: true })); app.use(compression()); app.use(express.json({ limit: '2mb' }));
+app.use((req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY'); next(); });
+const loginAttempts = new Map();
+app.post('/api/auth/login', (req, res) => { const ip = req.ip || 'unknown'; const now = Date.now(); const attempts = (loginAttempts.get(ip) || []).filter(t => now - t < 600000); if (attempts.length >= 10) return res.status(429).json({ success: false, error: 'Too many attempts. Try again later.' }); attempts.push(now); loginAttempts.set(ip, attempts); if (String(req.body?.password || '') !== PASSWORD) return res.status(401).json({ success: false, error: 'Incorrect password' }); loginAttempts.delete(ip); res.json({ success: true, token: issueToken(), expiresIn: 43200 }); });
+app.use('/api', (req, res, next) => req.path === '/auth/login' ? next() : requireAuth(req, res, next));
+const pool = new DevicePool();
+app.get('/api/devices', (req, res) => res.json({ success: true, data: pool.getAllJSON(), stats: pool.getStats() }));
+app.post('/api/devices', async (req, res) => { try { const { count = 1, devices, ...opts } = req.body || {}; if (Array.isArray(devices)) return res.json({ success: true, data: (await pool.addMany(devices)).map(d => d.toJSON()) }); const n = Math.min(Math.max(Number(count) || 1, 1), 20); const list = Array.from({ length: n }, (_, i) => ({ ...opts, name: n > 1 ? `${opts.name || opts.brand || 'Device'} ${String(pool.devices.size + i + 1).padStart(3, '0')}` : opts.name })); res.json({ success: true, data: (await pool.addMany(list)).map(d => d.toJSON()) }); } catch (e) { res.status(400).json({ success: false, error: e.message }); } });
+app.get('/api/devices/:id', (req, res) => { const d = pool.get(req.params.id); if (!d) return res.status(404).json({ success: false, error: 'Not found' }); res.json({ success: true, data: d.toJSON() }); });
+app.delete('/api/devices/:id', async (req, res) => { await pool.remove(req.params.id).catch(() => {}); res.json({ success: true }); });
+app.post('/api/devices/:id/action', async (req, res) => { try { res.json({ success: true, data: await pool.action(req.params.id, req.body.action, req.body) }); } catch (e) { res.status(400).json({ success: false, error: e.message }); } });
+app.post('/api/devices/:id/goto', async (req, res) => { try { res.json({ success: true, data: { url: await pool.action(req.params.id, 'goto', req.body) } }); } catch (e) { res.status(400).json({ success: false, error: e.message }); } });
+app.get('/api/devices/:id/screenshot', async (req, res) => { try { res.json({ success: true, data: { frame: await pool.action(req.params.id, 'screenshot') } }); } catch (e) { res.status(400).json({ success: false, error: e.message }); } });
+app.post('/api/batch', async (req, res) => { try { const { ids = [], action, params } = req.body || {}; if (!Array.isArray(ids) || ids.length > 50) throw new Error('Select up to 50 devices.'); res.json({ success: true, results: (await pool.batch(ids, action, params || {})).map((r, i) => ({ id: ids[i], ok: r.status === 'fulfilled', value: r.value, error: r.reason?.message })) }); } catch (e) { res.status(400).json({ success: false, error: e.message }); } });
+app.post('/api/farm/start-all', async (req, res) => { await pool.startAll(); res.json({ success: true }); }); app.post('/api/farm/stop-all', async (req, res) => { await pool.stopAll(); res.json({ success: true }); }); app.post('/api/farm/remove-all', async (req, res) => { await pool.removeAll(); res.json({ success: true }); });
+app.get('/api/stats', (req, res) => res.json({ success: true, data: pool.getStats() })); app.get('/api/audit', (req, res) => res.json({ success: true, data: pool.getAudit() })); app.get('/api/config', (req, res) => res.json({ success: true, data: { maxActive: pool.maxActive, screenshotInterval: pool.screenshotInterval, browserEvalEnabled: process.env.ENABLE_BROWSER_EVAL === 'true', mode: 'authorized-device-lab' } }));
+app.get('/health', (req, res) => res.json({ ok: true, uptime: Math.floor(process.uptime()), devices: pool.getStats(), version: '2.0.0' }));
+const PUBLIC = path.join(__dirname, 'public'); if (fs.existsSync(PUBLIC)) { app.use(express.static(PUBLIC)); app.get('*', (req, res) => res.sendFile(path.join(PUBLIC, 'index.html'))); }
+socketHandler(io, pool); const PORT = parseInt(process.env.PORT, 10) || 4000; server.listen(PORT, '0.0.0.0', () => console.log(`PhoneFarmZone backend listening on ${PORT}`));
+process.on('SIGTERM', async () => { await pool.stopAll(); server.close(() => process.exit(0)); }); process.on('uncaughtException', e => console.error('[uncaughtException]', e)); process.on('unhandledRejection', e => console.error('[unhandledRejection]', e));

@@ -31,9 +31,6 @@ export default function Home() {
   const [activeTab,setActiveTab]=useState('url');
   const [savingAdd, setSavingAdd] = useState(false);
   const [notice, setNotice] = useState('');
-  const [connectors, setConnectors] = useState([]);
-  const [pairCode, setPairCode] = useState('');
-  const [pairBusy, setPairBusy] = useState(false);
 
   // Load devices & subscribe to updates
   useEffect(() => {
@@ -48,14 +45,6 @@ export default function Home() {
   useEffect(() => {
     if (!authenticated) return undefined;
     devicesAPI.list().then(r => { setDevices(r.data||[]); setStats(r.stats||{}); }).catch(() => {});
-    const refreshConnectors = () => {
-      const token = window.localStorage.getItem('farm_token');
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://vpfarm-backend.onrender.com'}/api/connectors`, { headers: { authorization: `Bearer ${token}` } })
-        .then(r => r.json()).then(r => setConnectors(r.data || [])).catch(() => {});
-    };
-    refreshConnectors();
-    const connectorTimer = setInterval(refreshConnectors, 30000);
-
     const sock = getSocket();
     sock.on('farm:state',   ({ devices:d, stats:s }) => { setDevices(d||[]); setStats(s||{}); });
     sock.on('farm:devices', (d)  => setDevices(d||[]));
@@ -65,7 +54,7 @@ export default function Home() {
     const onDeviceError = ({ error } = {}) => setNotice(error || 'Backend could not create the device.');
     sock.on('device:error', onDeviceError);
 
-    return () => { clearInterval(connectorTimer); sock.off('farm:state'); sock.off('farm:devices'); sock.off('farm:stats'); sock.off('device:added'); sock.off('device:removed'); sock.off('device:error', onDeviceError); };
+    return () => { sock.off('farm:state'); sock.off('farm:devices'); sock.off('farm:stats'); sock.off('device:added'); sock.off('device:removed'); sock.off('device:error', onDeviceError); };
   }, [authenticated]);
 
   const login = async (event) => {
@@ -80,17 +69,6 @@ export default function Home() {
     } finally { setLoggingIn(false); }
   };
 
-  const createPairCode = async () => {
-    setPairBusy(true); setNotice('');
-    try {
-      const token = window.localStorage.getItem('farm_token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://vpfarm-backend.onrender.com'}/api/connectors/pair-request`, { method:'POST', headers:{ authorization:`Bearer ${token}` } });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Could not create pairing code.');
-      setPairCode(result.code);
-    } catch (error) { setNotice(error.message || 'Could not create pairing code.'); }
-    finally { setPairBusy(false); }
-  };
 
   if (!authReady) return <div style={{ minHeight:'100vh', background:st.darker }} />;
   if (!authenticated) return (
@@ -299,15 +277,6 @@ export default function Home() {
             <span style={{ marginLeft:'auto', fontSize:11, color:st.t3 }}>{filtered.length} devices</span>
           </div>
 
-          <section className="connector-panel" style={{ marginBottom:14, padding:12, background:'rgba(0,229,255,.035)', border:`1px solid ${st.cyan}20`, borderRadius:10 }}>
-            <div style={{ display:'flex', gap:8, alignItems:'center', justifyContent:'space-between', flexWrap:'wrap' }}>
-              <div><strong style={{ color:st.t1, fontSize:13 }}>Android connectors</strong><div style={{ color:st.t3, fontSize:11, marginTop:3 }}>Pair only devices whose owner has explicitly approved access.</div></div>
-              <button onClick={createPairCode} disabled={pairBusy} style={{ padding:'7px 10px', background:st.cyan, color:'#001018', border:0, borderRadius:7, fontWeight:800, cursor:'pointer', fontSize:11 }}>{pairBusy ? 'Creating…' : '＋ Pair Android phone'}</button>
-            </div>
-            {pairCode && <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}><span style={{ color:st.t2, fontSize:11 }}>Enter this one-time code in PhoneFarmConnectorApp:</span><code style={{ color:st.cyan, fontSize:20, fontWeight:900, letterSpacing:4 }}>{pairCode}</code></div>}
-            {connectors.length > 0 && <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:10 }}>{connectors.map(c => <span key={c.deviceId} style={{ padding:'5px 8px', borderRadius:6, background:c.status==='online'?'rgba(0,230,118,.1)':'rgba(255,214,0,.08)', color:c.status==='online'?st.green:st.yellow, fontSize:11 }}>{c.status==='online'?'●':'○'} {c.name}</span>)}</div>}
-          </section>
-
           {/* Device Grid */}
           {filtered.length === 0 ? (
             <div style={{ textAlign:'center', padding:'80px 20px', color:st.t3 }}>
@@ -495,8 +464,6 @@ export default function Home() {
         )}
         <footer className="app-footer" style={{ borderTop:`1px solid ${st.border}`, padding:'20px 16px 28px', marginTop:20, textAlign:'center', color:st.t3, fontSize:12, lineHeight:1.7 }}>
           <a href="https://phonefarmzone.vercel.app/" target="_blank" rel="noreferrer" style={{ color:st.cyan, fontWeight:800, textDecoration:'none' }}>PhoneFarmZone</a>
-          <span style={{ margin:'0 8px', opacity:.5 }}>·</span>
-          <a href="https://github.com/HumayunShariarHimu/PhoneFarmConnectorApp/releases" target="_blank" rel="noreferrer" style={{ color:st.cyan, fontWeight:700, textDecoration:'none' }}>Connector APK</a>
           <span style={{ margin:'0 8px', opacity:.5 }}>·</span>
           <span>Developed By </span>
           <a href="https://github.com/HumayunShariarHimu" target="_blank" rel="noreferrer" style={{ color:st.t1, fontWeight:700, textDecoration:'none' }}>Humayun Shariar Himu</a>

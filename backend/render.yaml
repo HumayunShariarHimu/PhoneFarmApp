@@ -2,17 +2,22 @@ services:
   - type: web
     name: vpfarm-backend
     env: node
-    buildCommand: npm install
+    rootDir: backend
+    buildCommand: npm install --no-audit --no-fund
     startCommand: node index.js
     healthCheckPath: /health
     envVars:
-      - key: PORT
-        value: 4000
       - key: NODE_ENV
         value: production
       - key: MAX_ACTIVE
         value: 3
-      - key: PUPPETEER_EXEC
-        value: /usr/bin/google-chrome-stable
+      - key: SCREENSHOT_INTERVAL
+        value: 800
+      - key: ENABLE_BROWSER_EVAL
+        value: "false"
       - key: FRONTEND_URL
         sync: false
+      - key: FARM_PASSWORD
+        sync: false
+      - key: FARM_SESSION_SECRET
+        generateValue: true
