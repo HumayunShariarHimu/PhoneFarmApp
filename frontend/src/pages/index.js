@@ -220,6 +220,9 @@ export default function Home() {
         .app-header { min-width:0; }
         .header-search { min-width:120px; }
         .header-actions { min-width:0; }
+        .mobile-bottom-nav { display:none; }
+        .glass-panel { background:rgba(11,17,32,.78) !important; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); box-shadow:0 16px 50px rgba(0,0,0,.22); }
+        button, input, select, textarea { -webkit-tap-highlight-color:transparent; }
         @media (max-width: 720px) {
           .app-header { height:auto !important; min-height:54px; padding:10px 12px !important; flex-wrap:wrap; }
           .header-search { order:3; flex-basis:100%; max-width:none !important; }
@@ -232,28 +235,39 @@ export default function Home() {
           .toolbar > select { flex:1; min-width:calc(50% - 4px); }
           .toolbar-actions { width:100%; }
           .toolbar-actions > button { flex:1; min-width:0; min-height:36px; }
-          .device-grid { grid-template-columns:repeat(2, minmax(0, 1fr)) !important; gap:8px !important; }
-          .device-card { min-width:0 !important; }
+          .device-grid { grid-template-columns:minmax(0, 1fr) !important; gap:10px !important; }
+          .device-card { min-width:0 !important; width:100%; max-width:520px; margin:0 auto; }
           .brand-picker { display:grid !important; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px !important; }
           .brand-picker > button { min-height:38px; }
           .device-card .device-select { width:28px !important; height:28px !important; top:3px !important; left:3px !important; }
           .device-card .device-icon-action { width:36px !important; min-height:34px; }
           .device-card .device-nav-action { min-width:26px; min-height:24px; }
           .device-card .device-meta { flex-wrap:wrap; gap:4px 8px !important; }
-          .modal-shell, .viewer-shell { width:100% !important; max-width:100% !important; max-height:calc(100vh - 16px) !important; padding:14px !important; border-radius:12px !important; }
+          .modal-shell { width:100% !important; max-width:100% !important; max-height:calc(100dvh - 16px) !important; padding:14px !important; border-radius:12px !important; }
+          .viewer-overlay { align-items:flex-end !important; padding:0 !important; }
+          .viewer-shell { width:100% !important; max-width:100% !important; max-height:96dvh !important; padding:12px 12px calc(14px + env(safe-area-inset-bottom)) !important; border-radius:18px 18px 0 0 !important; overflow-y:auto !important; display:grid !important; grid-template-columns:minmax(0, 1fr) !important; gap:12px !important; }
+          .viewer-shell::before { content:''; width:42px; height:4px; border-radius:8px; background:#34425a; margin:0 auto 2px; grid-column:1; }
+          .viewer-shell > .viewer-header-actions, .viewer-shell > .viewer-info { width:100% !important; min-width:0 !important; }
+          .viewer-shell > .viewer-header-actions { position:sticky; top:-12px; z-index:2; padding-top:8px; background:rgba(11,17,32,.96); }
+          .viewer-shell > div:not(.viewer-header-actions):not(.viewer-info) { margin:0 auto; }
           .modal-shell h3 { font-size:1rem; }
           .modal-shell input, .modal-shell select, .modal-shell textarea { min-height:40px; }
           .form-grid { grid-template-columns:1fr !important; gap:10px !important; }
           .modal-footer { flex-direction:column-reverse !important; }
           .modal-footer > button { width:100%; }
-          .viewer-shell { overflow-x:hidden !important; overflow-y:auto !important; }
           .viewer-info { width:100% !important; min-width:0 !important; }
           .viewer-header-actions { flex-wrap:wrap; justify-content:flex-end; }
         }
+          .mobile-bottom-nav { display:grid; grid-template-columns:repeat(4,1fr); position:fixed; left:0; right:0; bottom:0; z-index:120; padding:6px 8px calc(6px + env(safe-area-inset-bottom)); background:rgba(7,9,15,.94); border-top:1px solid ${st.border}; backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); gap:5px; }
+          .mobile-bottom-nav button { min-height:42px; border:1px solid ${st.border}; border-radius:9px; background:#0b1120; color:${st.t2}; font-size:11px; font-weight:700; }
+          .mobile-bottom-nav button.primary { background:${st.cyan}; color:#001018; border-color:${st.cyan}; }
+          .dashboard-content { padding-bottom:88px !important; }
+        }
         @media (max-width: 420px) {
           .header-actions > div:first-child { display:none; }
-          .device-grid { grid-template-columns:1fr !important; }
           .toolbar > select { min-width:100%; }
+          .header-actions { width:100%; margin-left:0 !important; justify-content:space-between; }
+          .header-actions > button { flex:1; }
         }
       `}</style>
 
@@ -355,9 +369,9 @@ export default function Home() {
 
         {/* ═══════ FULL-SCREEN DEVICE VIEWER ═══════ */}
         {viewing && (
-          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.88)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
+          <div className="viewer-overlay" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.88)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
             onClick={e => { if(e.target===e.currentTarget) setViewing(null); }}>
-            <div className="viewer-shell" style={{ background:st.dark, border:`1px solid ${st.cyan}30`, borderRadius:16, padding:20, maxHeight:'95vh', overflow:'auto', display:'flex', gap:20, flexWrap:'wrap', alignItems:'flex-start', maxWidth:'90vw' }}>
+            <div className="viewer-shell glass-panel" style={{ background:st.dark, border:`1px solid ${st.cyan}30`, borderRadius:16, padding:20, maxHeight:'95vh', overflow:'auto', display:'flex', gap:20, flexWrap:'wrap', alignItems:'flex-start', maxWidth:'90vw' }}>
               {/* Device info header */}
               <div className="viewer-header-actions" style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', paddingBottom:14, borderBottom:`1px solid ${st.border}` }}>
                 <div>
@@ -553,6 +567,12 @@ export default function Home() {
             </div>
           </div>
         )}
+        <nav className="mobile-bottom-nav" aria-label="Mobile dashboard actions">
+          <button className="primary" onClick={() => setShowAdd(true)}>＋ Add</button>
+          <button onClick={() => setShowBatch(true)}>Batch</button>
+          <button onClick={selected.size ? clearSel : selectAll}>{selected.size ? 'Clear' : 'Select'}</button>
+          <button onClick={() => ctrl.startAll()}>▶ Start</button>
+        </nav>
         <footer className="app-footer" style={{ borderTop:`1px solid ${st.border}`, padding:'20px 16px 28px', marginTop:20, textAlign:'center', color:st.t3, fontSize:12, lineHeight:1.7 }}>
           <a href="https://phonefarmzone.vercel.app/" target="_blank" rel="noreferrer" style={{ color:st.cyan, fontWeight:800, textDecoration:'none' }}>PhoneFarmZone</a>
           <span style={{ margin:'0 8px', opacity:.5 }}>·</span>

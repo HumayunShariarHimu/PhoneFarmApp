@@ -19,6 +19,7 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
   const [url,      setUrl]      = useState(device?.currentUrl || '');
   const [urlInput, setUrlInput] = useState('');
   const [typeText, setTypeText] = useState('');
+  const [touchPoint, setTouchPoint] = useState(null);
 
   const dw = device?.width  || 393;
   const dh = device?.height || 851;
@@ -81,6 +82,7 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
       touchRef.current = null; return;
     }
     const p = toDeviceCoords(e.clientX, e.clientY);
+    setTouchPoint(p); window.setTimeout(() => setTouchPoint(null), 420);
     const started = { clientX: e.clientX, clientY: e.clientY, x: p.x, y: p.y, time: Date.now(), moved: false, longPressed: false, pointerId: e.pointerId };
     touchRef.current = started;
     started.longTimer = setTimeout(() => {
@@ -242,6 +244,7 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
               style={{ width:'100%', height:'100%', objectFit:'fill', display:'block', pointerEvents:'none' }}
             />
           )}
+          {touchPoint && <span aria-hidden="true" style={{ position:'absolute', left:`${touchPoint.x / dw * 100}%`, top:`${touchPoint.y / dh * 100}%`, width:24, height:24, transform:'translate(-50%,-50%)', border:'2px solid rgba(0,229,255,.95)', borderRadius:'50%', boxShadow:'0 0 0 8px rgba(0,229,255,.12), 0 0 18px rgba(0,229,255,.9)', pointerEvents:'none', animation:'touch-ripple .42s ease-out forwards' }} />}
 
           {/* No frame yet */}
           {!frame && (
@@ -317,11 +320,11 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
             <input
               value={urlInput}
               onChange={e => setUrlInput(e.target.value)}
-              onKeyDown={e => { if(e.key==='Enter' && urlInput) { ctrl.goto(device.id, urlInput); setUrlInput(''); } }}
+              onKeyDown={e => { if(e.key==='Enter' && urlInput) { ctrl.goto(device.id, urlInput); onAction?.({ action:'goto', url:urlInput }); setUrlInput(''); } }}
               placeholder="URL or search..."
               style={{ flex:1, background:'#0b1120', border:'1px solid #162035', borderRadius:6, color:'#dde5f0', fontSize:11, padding:'6px 10px', outline:'none' }}
             />
-            <button onClick={() => { if(urlInput){ ctrl.goto(device.id, urlInput); setUrlInput(''); } }}
+            <button onClick={() => { if(urlInput){ ctrl.goto(device.id, urlInput); onAction?.({ action:'goto', url:urlInput }); setUrlInput(''); } }}
               style={{ padding:'6px 10px', background:'#00e5ff', color:'#000', border:'none', borderRadius:6, cursor:'pointer', fontSize:11, fontWeight:700 }}>
               Go
             </button>
@@ -331,11 +334,11 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
             <input
               value={typeText}
               onChange={e => setTypeText(e.target.value)}
-              onKeyDown={e => { if(e.key==='Enter'){ ctrl.type(device.id, typeText); setTypeText(''); } }}
+              onKeyDown={e => { if(e.key==='Enter'){ ctrl.type(device.id, typeText); onAction?.({ action:'type', text:typeText }); setTypeText(''); } }}
               placeholder="Type text..."
               style={{ flex:1, background:'#0b1120', border:'1px solid #162035', borderRadius:6, color:'#dde5f0', fontSize:11, padding:'6px 10px', outline:'none' }}
             />
-            <button onClick={() => { ctrl.type(device.id, typeText); setTypeText(''); }}
+            <button onClick={() => { ctrl.type(device.id, typeText); onAction?.({ action:'type', text:typeText }); setTypeText(''); }}
               style={{ padding:'6px 10px', background:'#111d2e', border:'1px solid #162035', borderRadius:6, color:'#6b7e99', cursor:'pointer', fontSize:11 }}>
               Send
             </button>
