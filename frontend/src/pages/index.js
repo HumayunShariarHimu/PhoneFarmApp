@@ -190,9 +190,10 @@ export default function Home() {
       setShowAdd(false);
     } catch (error) {
       const timedOut = error?.code === 'ECONNABORTED' || /timeout/i.test(error?.message || '');
+      const reason = error?.error || error?.message || 'Unknown network error';
       setNotice(timedOut
-        ? 'The Render backend is waking up. Please retry after a minute; no device was lost.'
-        : (error?.error || error?.message || 'Could not connect to the backend.'));
+        ? 'The Render backend is waking up. Please retry; no device was lost.'
+        : `Backend request failed: ${reason}. Check your connection and retry.`);
     } finally {
       setSavingAdd(false);
     }
@@ -387,7 +388,7 @@ export default function Home() {
               </div>
 
               {/* Phone screen */}
-              <PhoneScreen device={viewing} width={280} showControls={true} onAction={recordAction} />
+              <PhoneScreen device={viewing} width="min(100%, 393px)" showControls={true} onAction={recordAction} />
 
               {/* Extended controls */}
               <div className="viewer-info" style={{ flex:1, minWidth:240, display:'flex', flexDirection:'column', gap:12 }}>
@@ -529,7 +530,7 @@ export default function Home() {
                 ))}
               </div>
 
-              {notice && <div style={{ marginBottom:12, padding:'9px 10px', borderRadius:7, background:'rgba(255,23,68,.1)', border:'1px solid rgba(255,23,68,.25)', color:'#ff6b86', fontSize:12 }}>{notice}</div>}
+              {notice && <div style={{ marginBottom:12, padding:'9px 10px', borderRadius:7, background:'rgba(255,23,68,.1)', border:'1px solid rgba(255,23,68,.25)', color:'#ff6b86', fontSize:12, overflowWrap:'anywhere' }}><div>{notice}</div><button onClick={addDevices} disabled={savingAdd} style={{ marginTop:8, padding:'6px 10px', background:'rgba(255,107,134,.12)', border:'1px solid rgba(255,107,134,.3)', borderRadius:6, color:'#ff9aae', cursor:'pointer', fontSize:11 }}>↻ Retry request</button></div>}
 
               <div className="modal-footer" style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
                 <button onClick={()=>setShowAdd(false)} style={{ padding:'10px 18px', background:'#111d2e', border:`1px solid ${st.border}`, borderRadius:8, color:st.t2, cursor:'pointer', fontSize:13 }}>Cancel</button>

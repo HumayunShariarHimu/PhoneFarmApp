@@ -23,7 +23,8 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
 
   const dw = device?.width  || 393;
   const dh = device?.height || 851;
-  const h  = Math.round(width * dh / dw);
+  const numericWidth = typeof width === 'number' ? width : 393;
+  const h  = typeof width === 'number' ? Math.round(width * dh / dw) : undefined;
 
   // Subscribe to live frames
   useEffect(() => {
@@ -183,13 +184,13 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
   const sColor = statusColor[device?.status] || '#3a4560';
 
   return (
-    <div className={className} style={{ width, userSelect:'none', fontFamily:'system-ui,sans-serif' }}>
+    <div className={className} style={{ width, maxWidth:'100%', userSelect:'none', fontFamily:'system-ui,sans-serif' }}>
 
       {/* Status bar */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'3px 8px', background:'#0b1120', borderRadius:'8px 8px 0 0', border:'1px solid #162035', borderBottom:'none' }}>
         <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, color:'#6b7e99', overflow:'hidden' }}>
           <span style={{ width:7, height:7, borderRadius:'50%', background:sColor, display:'inline-block', flexShrink:0, boxShadow: isRunning ? `0 0 5px ${sColor}` : 'none' }}></span>
-          <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth: width - 80 }}>{device?.name}</span>
+          <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth: numericWidth - 80 }}>{device?.name}</span>
         </div>
         <div style={{ display:'flex', gap:4, flexShrink:0 }}>
           {isRunning && (
@@ -225,7 +226,7 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
         <div
           ref={containerRef}
           tabIndex={0}
-          style={{ width:'100%', height:h, background:'#000', position:'relative', cursor: isRunning ? 'crosshair' : 'default', outline:'none', overflow:'hidden', display:'block', touchAction:'none', WebkitUserSelect:'none' }}
+          style={{ width:'100%', height:h || 'auto', aspectRatio:`${dw} / ${dh}`, background:'#000', position:'relative', cursor: isRunning ? 'crosshair' : 'default', outline:'none', overflow:'hidden', display:'block', touchAction:'none', WebkitUserSelect:'none' }}
           onContextMenu={onContextMenu}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
