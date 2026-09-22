@@ -10,6 +10,7 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
   const imgRef      = useRef(null);
   const containerRef = useRef(null);
   const touchRef    = useRef(null);
+  const lastTapRef  = useRef(null);
 
   const [frame,    setFrame]    = useState(null);
   const [live,     setLive]     = useState(false);
@@ -54,15 +55,6 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
     };
   }, [dw, dh]);
 
-  // Mouse click → tap
-  const onMouseDown = useCallback((e) => {
-    if (device?.status !== 'running') return;
-    e.preventDefault();
-    const { x, y } = toDeviceCoords(e.clientX, e.clientY);
-    if (e.detail === 2) { ctrl.doubleTap(device.id, x, y); }
-    else                { ctrl.tap(device.id, x, y); }
-  }, [device?.id, device?.status, toDeviceCoords]);
-
   // Right-click → long press
   const onContextMenu = useCallback((e) => {
     e.preventDefault();
@@ -71,38 +63,64 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
     ctrl.longPress(device.id, x, y, 1000);
   }, [device?.id, device?.status, toDeviceCoords]);
 
-  // Touch events → swipe/tap
-  const onTouchStart = useCallback((e) => {
-    if (device?.status !== 'running') return;
-    const t = e.touches[0];
-    const rect = containerRef.current?.getBoundingClientRect();
-    touchRef.current = { x: t.clientX - rect.left, y: t.clientY - rect.top, time: Date.now() };
-  }, [device?.status]);
+  // Pointer events unify mouse, touch and stylus. This prevents mobile browsers
+  // from scrolling/zooming the dashboard instead of forwarding the gesture.
+  const onPointerDown = useCallback((e) => {
+    if (device?.status !== 'running' || e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    containerRef.current?.setPointerCapture?.(e.pointerId);
+    const p = toDeviceCoords(e.clientX, e.clientY);
+    const started = { clientX: e.clientX, clientY: e.clientY, x: p.x, y: p.y, time: Date.now(), moved: false, longPressed: false, pointerId: e.pointerId };
+    touchRef.current = started;
+    started.longTimer = setTimeout(() => {
+      if (touchRef.current === started && !started.moved) {
+        started.longPressed = true;
+        ctrl.longPress(device.id, started.x, started.y, 700);
+      }
+    }, 650);
+  }, [device?.id, device?.status, toDeviceCoords]);
 
-  const onTouchEnd = useCallback((e) => {
-    if (!touchRef.current || device?.status !== 'running') return;
-    const t = e.changedTouches[0];
-    const rect = containerRef.current?.getBoundingClientRect();
-    const ex = t.clientX - rect.left;
-    const ey = t.clientY - rect.top;
-    const { x: sx, y: sy, time } = touchRef.current;
-    const dx = ex - sx, dy = ey - sy;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    const dur  = Date.now() - time;
+  const onPointerMove = useCallback((e) => {
+    const start = touchRef.current;
+    if (!start || start.pointerId !== e.pointerId) return;
+    const dx = e.clientX - start.clientX;
+    const dy = e.clientY - start.clientY;
+    if (Math.sqrt(dx * dx + dy * dy) > 12) start.moved = true;
+  }, []);
 
-    const scaleX = dw / rect.width;
-    const scaleY = dh / rect.height;
-
-    if (dist < 12 && dur < 300) {
-      ctrl.tap(device.id, Math.round(ex * scaleX), Math.round(ey * scaleY));
-    } else {
-      ctrl.swipe(device.id,
-        Math.round(sx*scaleX), Math.round(sy*scaleY),
-        Math.round(ex*scaleX), Math.round(ey*scaleY),
-        Math.min(dur, 800));
+  const onPointerUp = useCallback((e) => {
+    const start = touchRef.current;
+    if (!start || start.pointerId !== e.pointerId || device?.status !== 'running') return;
+    clearTimeout(start.longTimer);
+    const end = toDeviceCoords(e.clientX, e.clientY);
+    const dx = e.clientX - start.clientX;
+    const dy = e.clientY - start.clientY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const duration = Math.max(1, Date.now() - start.time);
+    if (!start.longPressed) {
+      if (dist <= 12) {
+        const previous = lastTapRef.current;
+        if (previous && Date.now() - previous.time < 320 && Math.abs(previous.x - end.x) < 24 && Math.abs(previous.y - end.y) < 24) {
+          clearTimeout(previous.timer);
+          lastTapRef.current = null;
+          ctrl.doubleTap(device.id, end.x, end.y);
+        } else {
+          const timer = setTimeout(() => { ctrl.tap(device.id, end.x, end.y); lastTapRef.current = null; }, 180);
+          lastTapRef.current = { x: end.x, y: end.y, time: Date.now(), timer };
+        }
+      } else {
+        ctrl.swipe(device.id, start.x, start.y, end.x, end.y, Math.min(duration, 1200));
+      }
     }
     touchRef.current = null;
-  }, [device?.id, device?.status, dw, dh]);
+  }, [device?.id, device?.status, toDeviceCoords]);
+
+  const onPointerCancel = useCallback((e) => {
+    if (touchRef.current?.pointerId === e.pointerId) {
+      clearTimeout(touchRef.current.longTimer);
+      touchRef.current = null;
+    }
+  }, []);
 
   // Keyboard forwarding
   const onKeyDown = useCallback((e) => {
@@ -175,11 +193,12 @@ export default function PhoneScreen({ device, width = 280, showControls = true, 
         <div
           ref={containerRef}
           tabIndex={0}
-          style={{ width:'100%', height:h, background:'#000', position:'relative', cursor: isRunning ? 'crosshair' : 'default', outline:'none', overflow:'hidden', display:'block' }}
-          onMouseDown={onMouseDown}
+          style={{ width:'100%', height:h, background:'#000', position:'relative', cursor: isRunning ? 'crosshair' : 'default', outline:'none', overflow:'hidden', display:'block', touchAction:'none', WebkitUserSelect:'none' }}
           onContextMenu={onContextMenu}
-          onTouchStart={onTouchStart}
-          onTouchEnd={onTouchEnd}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
           onKeyDown={onKeyDown}
           onWheel={onWheel}
         >

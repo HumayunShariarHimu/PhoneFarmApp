@@ -70,19 +70,26 @@ export default function Home() {
   };
 
 
-  if (!authReady) return <div style={{ minHeight:'100vh', background:st.darker }} />;
+  if (!authReady) return <div style={{ minHeight:'100dvh', width:'100%', background:st.darker }} />;
   if (!authenticated) return (
-    <main style={{ minHeight:'100vh', display:'grid', placeItems:'center', background:`radial-gradient(circle at 20% 0%, #122640 0%, ${st.darker} 45%)`, color:st.t1, padding:20 }}>
-      <form onSubmit={login} style={{ width:'100%', maxWidth:390, background:'rgba(11,17,32,.92)', border:`1px solid ${st.border}`, borderRadius:18, padding:32, boxShadow:'0 22px 70px rgba(0,0,0,.45)' }}>
-        <div style={{ color:st.cyan, fontSize:12, letterSpacing:3, fontWeight:800 }}>PHONEFARMZONE / OWNER ACCESS</div>
-        <h1 style={{ margin:'12px 0 8px', fontSize:28 }}>Secure control room</h1>
-        <p style={{ color:st.t2, fontSize:13, lineHeight:1.6, marginBottom:24 }}>Enter the owner password to open the virtual device dashboard. Unauthenticated visitors cannot reach the API or live socket.</p>
-        <label style={{ display:'block', color:st.t2, fontSize:12, marginBottom:7 }}>Password</label>
-        <input autoFocus type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Owner password" style={{ ...inp, padding:'12px 14px', fontSize:15, marginBottom:12 }} />
-        {authError && <div role="alert" style={{ color:'#ff6b88', background:'rgba(255,23,68,.1)', border:'1px solid rgba(255,23,68,.25)', borderRadius:8, padding:'9px 10px', fontSize:12, marginBottom:12 }}>{authError}</div>}
-        <button disabled={loggingIn || !password} type="submit" style={{ width:'100%', padding:'12px 14px', border:0, borderRadius:9, background:st.cyan, color:'#001018', fontWeight:800, cursor:loggingIn?'wait':'pointer', opacity:(loggingIn || !password) ? .8 : 1 }}>{loggingIn ? 'Checking…' : 'Unlock dashboard'}</button>
+    <>
+      <Head><title>PhoneFarmZone — Owner Access</title><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" /></Head>
+      <style jsx global>{`
+        :global(html), :global(body), :global(#__next) { margin:0; min-height:100%; width:100%; background:${st.darker}; }
+        :global(*), :global(*::before), :global(*::after) { box-sizing:border-box; }
+      `}</style>
+    <main style={{ minHeight:'100dvh', width:'100%', display:'flex', alignItems:'center', justifyContent:'center', background:`radial-gradient(circle at 20% 0%, #122640 0%, ${st.darker} 48%)`, color:st.t1, padding:'max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))', overflowY:'auto' }}>
+      <form onSubmit={login} style={{ width:'100%', maxWidth:390, background:'rgba(11,17,32,.94)', border:`1px solid ${st.border}`, borderRadius:'clamp(12px, 4vw, 18px)', padding:'clamp(20px, 7vw, 32px)', boxShadow:'0 22px 70px rgba(0,0,0,.45)' }}>
+        <div style={{ color:st.cyan, fontSize:'clamp(10px, 2.8vw, 12px)', letterSpacing:'clamp(1.5px, .7vw, 3px)', fontWeight:800, overflowWrap:'anywhere' }}>PHONEFARMZONE / OWNER ACCESS</div>
+        <h1 style={{ margin:'12px 0 8px', fontSize:'clamp(24px, 8vw, 28px)', lineHeight:1.15 }}>Secure control room</h1>
+        <p style={{ color:st.t2, fontSize:13, lineHeight:1.6, margin:'0 0 24px' }}>Enter the owner password to open the virtual device dashboard. Unauthenticated visitors cannot reach the API or live socket.</p>
+        <label htmlFor="owner-password" style={{ display:'block', color:st.t2, fontSize:12, marginBottom:7 }}>Password</label>
+        <input id="owner-password" autoFocus type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Owner password" autoComplete="current-password" style={{ ...inp, minHeight:46, padding:'12px 14px', fontSize:16, marginBottom:12 }} />
+        {authError && <div role="alert" style={{ color:'#ff6b88', background:'rgba(255,23,68,.1)', border:'1px solid rgba(255,23,68,.25)', borderRadius:8, padding:'9px 10px', fontSize:12, marginBottom:12, overflowWrap:'anywhere' }}>{authError}</div>}
+        <button disabled={loggingIn || !password} type="submit" style={{ width:'100%', minHeight:46, padding:'12px 14px', border:0, borderRadius:9, background:st.cyan, color:'#001018', fontWeight:800, cursor:loggingIn?'wait':'pointer', opacity:(loggingIn || !password) ? .8 : 1 }}>{loggingIn ? 'Checking…' : 'Unlock dashboard'}</button>
       </form>
     </main>
+    </>
   );
 
   // Filtered devices
