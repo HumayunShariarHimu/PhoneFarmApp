@@ -1,9 +1,10 @@
 'use strict';
 
 module.exports = function socketHandler(io, pool) {
+  const safeDevices = () => { try { return pool.getAllJSON(); } catch (error) { console.error('[state-broadcast]', error.message); return []; } };
   io.on('connection', socket => {
-    socket.emit('farm:state', { devices: pool.getAllJSON(), stats: pool.getStats() });
-    const broadcastState = () => io.emit('farm:state', { devices: pool.getAllJSON(), stats: pool.getStats() });
+    socket.emit('farm:state', { devices: safeDevices(), stats: pool.getStats() });
+    const broadcastState = () => io.emit('farm:state', { devices: safeDevices(), stats: pool.getStats() });
     const handle = action => async data => { try { const result = await pool.action(data.id, action, data); if (action === 'screenshot') socket.emit('device:screenshot', { id: data.id, frame: result }); else if (action === 'eval') socket.emit('device:eval:result', { id: data.id, result }); else if (['diagnostics', 'clipboard_get'].includes(action)) socket.emit(`device:${action}:result`, { id: data.id, result }); broadcastState(); } catch (e) { socket.emit('device:error', { id: data.id, error: e.message }); } };
 
     ['tap', 'double_tap', 'long_press', 'swipe', 'pinch', 'swipe_up', 'swipe_down', 'swipe_left', 'swipe_right', 'type', 'key', 'clear', 'scroll_down', 'scroll_up', 'scroll_top', 'scroll_bottom', 'back', 'forward', 'reload', 'goto', 'screenshot', 'eval', 'network', 'geolocation', 'clear_storage', 'diagnostics', 'clipboard_get', 'clipboard_set'].forEach(action => socket.on(action, handle(action)));
@@ -22,5 +23,5 @@ module.exports = function socketHandler(io, pool) {
     socket.on('unsubscribe', ({ id } = {}) => socket.leave(`dev:${id}`));
   });
   setInterval(() => io.volatile.emit('farm:stats', pool.getStats()), 4000);
-  setInterval(() => io.volatile.emit('farm:devices', pool.getAllJSON()), 6000);
+  setInterval(() => io.volatile.emit('farm:devices', safeDevices()), 6000);
 };

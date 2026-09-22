@@ -159,7 +159,10 @@ class VirtualDevice extends EventEmitter {
     return { id: this.id, url: this.getUrl(), title: page ? await page.title().catch(() => '') : '', network: this.network, geolocation: this.geolocation, requestCount: this.requestCount, failedRequestCount: this.failedRequestCount, cookies: this.cookies, storage, logs: this.logs.slice(0, 80), frameAt: this.lastFrameAt };
   }
   async eval(code) { if (process.env.ENABLE_BROWSER_EVAL !== 'true') throw new Error('Browser evaluation is disabled by default; enable only for authorized QA.'); return this.page?.evaluate(String(code || '').slice(0, 20000)); }
-  getUrl() { return this.page?.url() || this.currentUrl; }
+  getUrl() {
+    if (!this.page) return this.currentUrl;
+    try { return this.page.url() || this.currentUrl; } catch { return this.currentUrl; }
+  }
   async screenshot() { return this.page?.screenshot({ encoding: 'base64', type: 'jpeg', quality: 60 }).catch(() => null); }
   async _sendFrame() { if (!this.page || this.status === 'stopped' || !global.io) return; const frame = await this.screenshot(); if (frame) { this.lastFrameAt = new Date().toISOString(); global.io.volatile.emit(`device:frame:${this.id}`, { id: this.id, frame, url: this.page.url(), ts: Date.now() }); } }
   _sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
