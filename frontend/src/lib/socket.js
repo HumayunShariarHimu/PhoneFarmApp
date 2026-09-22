@@ -1,7 +1,7 @@
 // socket.js
 import { io } from 'socket.io-client';
 
-const WS = process.env.NEXT_PUBLIC_WS_URL || 'https://vpfarm-backend.onrender.com';
+const WS = String(process.env.NEXT_PUBLIC_WS_URL || 'https://vpfarm-backend.onrender.com').replace(/\/+$/, '');
 let socket = null;
 
 export function getSocket() {

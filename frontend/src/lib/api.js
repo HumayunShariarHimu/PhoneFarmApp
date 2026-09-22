@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || 'https://vpfarm-backend.onrender.com';
+const BASE = String(process.env.NEXT_PUBLIC_API_URL || 'https://vpfarm-backend.onrender.com').replace(/\/+$/, '');
 
 // Render free services can take 30–90 seconds to wake from sleep. Keep the
 // request alive long enough for the service to wake instead of showing a
