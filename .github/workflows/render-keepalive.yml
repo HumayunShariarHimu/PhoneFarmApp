@@ -2,13 +2,18 @@ name: Keep Render backend awake
 
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    # GitHub Actions' shortest supported scheduled interval is five minutes.
+    - cron: '*/5 * * * *'
   workflow_dispatch:
+
+concurrency:
+  group: render-backend-keepalive
+  cancel-in-progress: true
 
 jobs:
   ping-render:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 3
     steps:
       - name: Wake and verify Render health endpoint
         env:
@@ -16,9 +21,10 @@ jobs:
         run: |
           set -euo pipefail
           response="$(curl --fail --silent --show-error --location \
+            --retry 3 --retry-delay 5 --retry-all-errors \
             --connect-timeout 20 --max-time 90 \
             -H 'Cache-Control: no-cache' \
-            -H 'User-Agent: PhoneFarmZone-Render-KeepAlive/1.0' \
+            -H 'User-Agent: PhoneFarmZone-Render-KeepAlive/2.0' \
             "$HEALTH_URL")"
           echo "$response"
           echo "$response" | grep -q '"ok":true'

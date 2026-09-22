@@ -44,7 +44,7 @@ Set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` to `http://localhost:4000` wh
 
 The backend is configured by [`backend/render.yaml`](backend/render.yaml). In Render, confirm the service uses the repository root directory `backend`, build command `npm install --no-audit --no-fund`, start command `node index.js`, and health path `/health`. Set the secret environment values `FRONTEND_URL`, `FARM_PASSWORD`, and `FARM_SESSION_SECRET`; do not use the old default password in production. The free plan is suitable for a small QA pool only; Chromium sessions are memory-intensive, so increase `MAX_ACTIVE` only after observing memory and restart behavior on an appropriately sized plan.
 
-The health response contains `ok`, uptime, version and device counts. Render should use `/health` for automatic service health checks. The GitHub keep-alive workflow is only an availability hint; it cannot prevent every platform sleep policy and should not be treated as a substitute for a paid always-on plan.
+The health response contains `ok`, uptime, version and device counts. Render uses `/health` for automatic service health checks. In addition, `.github/workflows/render-keepalive.yml` sends an external health ping every five minutes with retries and overlap protection. This is the correct place for the keep-alive scheduler because an application cannot wake itself while its host process is asleep. Render may still apply free-plan sleep or scheduled-workflow delays, so this workflow is an availability aid and not a contractual substitute for a paid always-on plan.
 
 ## Vercel deployment
 
