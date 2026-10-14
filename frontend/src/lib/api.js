@@ -48,6 +48,8 @@ export const devicesAPI = {
   addRecordingAction:(id, action) => api.post(`/recordings/${id}/actions`, action),
   replayRecording:(id, ids) => api.post(`/recordings/${id}/replay`, { ids }),
   deleteRecording:(id)      => api.delete(`/recordings/${id}`),
+  createPairCode:()         => api.post('/connectors/pair-code'),
+  connectors:   ()          => api.get('/connectors'),
 };
 
 export default api;

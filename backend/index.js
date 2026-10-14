@@ -7,8 +7,9 @@ const cors = require('cors');
 const compression = require('compression');
 const path = require('path');
 const fs = require('fs');
-const { PASSWORD, issueToken, requireAuth, isValidToken } = require('./src/auth');
+const { PASSWORD, issueToken, requireAuth, isValidToken, tokenFromRequest } = require('./src/auth');
 const { DevicePool, NETWORK_PROFILES } = require('./src/DevicePool');
+const connectors = require('./src/connectors');
 const socketHandler = require('./src/socket');
 
 const configuredOrigins = String(process.env.FRONTEND_URL || '').split(',').map(v => v.trim()).filter(Boolean);
@@ -22,9 +23,22 @@ app.use((req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff')
 
 const loginAttempts = new Map();
 app.post('/api/auth/login', (req, res) => { const ip = req.ip || 'unknown'; const now = Date.now(); const attempts = (loginAttempts.get(ip) || []).filter(t => now - t < 600000); if (attempts.length >= 10) return res.status(429).json({ success: false, error: 'Too many attempts. Try again later.' }); attempts.push(now); loginAttempts.set(ip, attempts); if (String(req.body?.password || '') !== PASSWORD) return res.status(401).json({ success: false, error: 'Incorrect password' }); loginAttempts.delete(ip); res.json({ success: true, token: issueToken(), expiresIn: 43200 }); });
-app.use('/api', (req, res, next) => req.path === '/auth/login' ? next() : requireAuth(req, res, next));
+app.post('/api/connectors/pair', (req, res) => { try { res.json({ success: true, ...connectors.pair(req.body || {}) }); } catch (error) { res.status(400).json({ success: false, error: error.message }); } });
+app.use('/api', (req, res, next) => ['/auth/login', '/connectors/pair', '/connectors/heartbeat', '/connectors/revoke'].includes(req.path) ? next() : requireAuth(req, res, next));
 const pool = new DevicePool();
 const wrap = handler => (req, res) => Promise.resolve(handler(req, res)).catch(e => res.status(400).json({ success: false, error: e.message }));
+
+const requireConnector = (req, res, next) => {
+  const connector = connectors.authenticate(tokenFromRequest(req));
+  if (!connector) return res.status(401).json({ success: false, error: 'Connector authentication required' });
+  req.connector = connector;
+  next();
+};
+
+app.post('/api/connectors/pair-code', (req, res) => res.json({ success: true, data: connectors.createPairCode() }));
+app.get('/api/connectors', (req, res) => res.json({ success: true, data: connectors.list() }));
+app.post('/api/connectors/heartbeat', requireConnector, (req, res) => { try { res.json({ success: true, data: connectors.heartbeat(tokenFromRequest(req), req.body || {}) }); } catch (error) { res.status(401).json({ success: false, error: error.message }); } });
+app.post('/api/connectors/revoke', requireConnector, (req, res) => { try { res.json(connectors.revoke(tokenFromRequest(req))); } catch (error) { res.status(401).json({ success: false, error: error.message }); } });
 
 app.get('/api/devices', (req, res) => res.json({ success: true, data: pool.getAllJSON(), stats: pool.getStats() }));
 app.post('/api/devices', wrap(async (req, res) => { const { count = 1, devices, ...opts } = req.body || {}; if (Array.isArray(devices)) return res.json({ success: true, data: (await pool.addMany(devices)).map(d => d.toJSON()) }); const n = Math.min(Math.max(Number(count) || 1, 1), 20); const list = Array.from({ length: n }, (_, i) => ({ ...opts, name: n > 1 ? `${opts.name || opts.brand || 'Device'} ${String(pool.devices.size + i + 1).padStart(3, '0')}` : opts.name })); res.json({ success: true, data: (await pool.addMany(list)).map(d => d.toJSON()) }); }));

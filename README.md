@@ -353,6 +353,18 @@ Authorization: Bearer <TOKEN>
 | `POST` | `/api/devices/:id/geolocation` | Change geolocation |
 | `POST` | `/api/devices/:id/clipboard` | Read or write clipboard data |
 
+### Android QA connectors
+
+The Android companion is an owner-visible connector for authorized testing. It does not create hidden Android clones or silently install packages. Open the public download page at `/download`, install the PhoneFarm APK from GitHub Releases, then use **Pair Android** in the owner dashboard to generate a one-time 6-digit code.
+
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `POST` | `/api/connectors/pair` | One-time code | Pair an Android connector with explicit consent |
+| `POST` | `/api/connectors/pair-code` | Owner token | Generate a 10-minute pairing code |
+| `GET` | `/api/connectors` | Owner token | List paired connector status and capabilities |
+| `POST` | `/api/connectors/heartbeat` | Connector token | Update online status and capabilities |
+| `POST` | `/api/connectors/revoke` | Connector token | Revoke the connector token |
+
 Example requests:
 
 ```bash

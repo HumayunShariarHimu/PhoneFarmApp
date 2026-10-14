@@ -41,6 +41,9 @@ export default function Home() {
   const [recordingName, setRecordingName] = useState('Mobile smoke test');
   const [recordingActions, setRecordingActions] = useState([]);
   const [savedRecordings, setSavedRecordings] = useState([]);
+  const [showPairing, setShowPairing] = useState(false);
+  const [pairCode, setPairCode] = useState(null);
+  const [connectors, setConnectors] = useState([]);
 
   // Load devices & subscribe to updates
   useEffect(() => {
@@ -70,7 +73,16 @@ export default function Home() {
   useEffect(() => {
     if (!authenticated) return;
     devicesAPI.recordings().then(result => setSavedRecordings(result.data || [])).catch(() => {});
+    devicesAPI.connectors().then(result => setConnectors(result.data || [])).catch(() => {});
   }, [authenticated, viewing?.id]);
+
+  const createPairCode = async () => {
+    try {
+      const result = await devicesAPI.createPairCode();
+      setPairCode(result.data || null);
+      setShowPairing(true);
+    } catch (error) { setNotice(error?.error || error?.message || 'Could not create pairing code.'); }
+  };
 
   const login = async (event) => {
     event.preventDefault();
@@ -300,6 +312,7 @@ export default function Home() {
               </div>
             </div>
             <button onClick={() => setShowAdd(true)}     style={{ padding:'7px 14px', background:st.cyan, color:'#000', border:'none', borderRadius:8, fontWeight:800, cursor:'pointer', fontSize:12, flexShrink:0 }}>＋ Add</button>
+            <button onClick={createPairCode} style={{ padding:'7px 12px', background:'rgba(0,230,118,.1)', border:`1px solid ${st.green}40`, borderRadius:8, color:st.green, cursor:'pointer', fontSize:12 }}>Pair Android</button>
             <button onClick={() => setShowBatch(true)}   style={{ padding:'7px 12px', background:st.dark, border:`1px solid ${st.border}`, borderRadius:8, color:st.t2, cursor:'pointer', fontSize:12 }}>Batch</button>
             <button onClick={() => { window.localStorage.removeItem('farm_token'); disconnectSocket(); setAuthenticated(false); }} style={{ padding:'7px 10px', background:'transparent', border:`1px solid ${st.border}`, borderRadius:8, color:st.t3, cursor:'pointer', fontSize:12 }} aria-label="Lock dashboard">Lock</button>
           </div>
@@ -565,6 +578,17 @@ export default function Home() {
                 <button onClick={()=>setShowBatch(false)} style={{ padding:'10px 18px', background:'#111d2e', border:`1px solid ${st.border}`, borderRadius:8, color:st.t2, cursor:'pointer', fontSize:13 }}>Cancel</button>
                 <button onClick={runBatch} style={{ padding:'10px 18px', background:st.cyan, color:'#000', border:'none', borderRadius:8, fontWeight:800, cursor:'pointer', fontSize:13 }}>▶ Run on All</button>
               </div>
+            </div>
+          </div>
+        )}
+        {showPairing && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.82)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={e => e.target===e.currentTarget && setShowPairing(false)}>
+            <div className="modal-shell" style={{ background:st.dark, border:`1px solid ${st.green}40`, borderRadius:16, padding:24, width:440, maxWidth:'95vw' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:14 }}><h3 style={{ margin:0, color:'#fff' }}>Pair PhoneFarm Android</h3><button onClick={()=>setShowPairing(false)} style={{ background:'none', border:'none', color:st.t2, cursor:'pointer', fontSize:22 }}>✕</button></div>
+              <p style={{ color:st.t2, fontSize:12, lineHeight:1.6, marginTop:0 }}>Open the PhoneFarm Android app on the device owner’s phone and enter this one-time code. The code expires in 10 minutes.</p>
+              <div style={{ textAlign:'center', letterSpacing:8, fontSize:34, fontWeight:900, color:st.green, padding:'18px 8px', background:'#07150f', borderRadius:10 }}>{pairCode?.code || '------'}</div>
+              <div style={{ marginTop:14, fontSize:11, color:st.t3 }}>Connected devices: {connectors.filter(c=>c.status==='online').length} online · {connectors.length} paired</div>
+              <button onClick={createPairCode} style={{ marginTop:16, width:'100%', padding:10, background:'#111d2e', border:`1px solid ${st.border}`, borderRadius:8, color:st.cyan, cursor:'pointer', fontWeight:700 }}>Generate new code</button>
             </div>
           </div>
         )}
